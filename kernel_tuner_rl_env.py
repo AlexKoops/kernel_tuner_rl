@@ -6,10 +6,13 @@ from kernel_tuner import Searchspace
 
 
 class KernelTunerRLEnv(gym.Env):
-    def __init__(self, tune_params: dict):
+    def __init__(self, Searchspace: Searchspace):
         super().__init__()
 
-        self.number_of_parameters = len(tune_params)
+        self.searchspace = Searchspace
+
+        # kernel_tuner.Searchspace class has a self.tune_params: dict parameter
+        self.number_of_parameters = len(Searchspace.tune_params)
 
         # The observation or state space for this environment is defined as follows:
         #   * current kernel configuration
