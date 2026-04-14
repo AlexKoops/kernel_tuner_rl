@@ -37,6 +37,9 @@ class SearchspaceInfo:
 
         self.neighbours = neighbours
 
+        empty = [k for k, v in neighbours.items() if len(v) == 0]
+        print(f"Configs with no neighbours: {len(empty)}")
+
     def _get_config_exec_time(self, config):
         cache_key = ",".join(str(v) for v in config.values())
         time = self.cache[cache_key]["time"]

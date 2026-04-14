@@ -22,6 +22,12 @@ def cache_to_searchSpaceInfo(cache_file):
 
     keys = list(tune_params.keys())
     searchspace = [dict(zip(keys, map(eval, key.split(",")))) for key in cache_with_exec_time.keys()]
+    searchspace = [
+        config
+        for config in searchspace
+        if isinstance(cache_with_exec_time[",".join(str(v) for v in config.values())]["time"], (int, float))
+        and cache_with_exec_time[",".join(str(v) for v in config.values())]["time"] != float("inf")
+    ]
     return (
         searchspace,
         cache_with_exec_time,

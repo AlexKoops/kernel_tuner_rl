@@ -30,8 +30,11 @@ class KernelTunerRLEnv(gym.Env):
 
         # highest config execution time, will be used for the normalization
         self.max_exec_time = max(
-            self.searchspaceInfo._get_config_exec_time(c) for c in self.searchspaceInfo.searchspace
+            t
+            for t in (self.searchspaceInfo._get_config_exec_time(c) for c in self.searchspaceInfo.searchspace)
+            if t != float("inf")
         )
+        print(f"max_exec_time: {self.max_exec_time}")
 
         # The observation or state space for this environment is defined as follows:
         #   * current kernel configuration
@@ -91,7 +94,11 @@ class KernelTunerRLEnv(gym.Env):
 
         # append the normalized exec time at the end
         exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
-        normalized_list.append(exec_time / self.max_exec_time)
+        if exec_time == float("inf"):
+            normalized_exec_time = 1.0
+        else:
+            normalized_exec_time = exec_time / self.max_exec_time
+        normalized_list.append(normalized_exec_time)
 
         return np.array(normalized_list, dtype=np.float32)
 
@@ -99,7 +106,7 @@ class KernelTunerRLEnv(gym.Env):
         # Generate extra info for debugging purposes
         pass
 
-    def reset(self, seed: Optional[int] = None):
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
         if seed is not None:
@@ -124,6 +131,9 @@ class KernelTunerRLEnv(gym.Env):
         # get the index for the current parameter setting
         tune_param_index = self.searchspaceInfo.tune_params[key_to_update].index(new_config[key_to_update])
         prev_exec_time = self.current_exec_time
+
+        # add protection agains exec time becoming inf
+        prev_exec_time = min(prev_exec_time, self.max_exec_time)
 
         # first 2 if elif statements are only added for check_env() to be able to pass, since this does not support action maskign
         if direction == 0 and tune_param_index == 0:
@@ -156,9 +166,12 @@ class KernelTunerRLEnv(gym.Env):
         # get reward, based on current and new exec_time
 
         self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
         diff = prev_exec_time - self.current_exec_time
 
         reward = diff
+        if np.isnan(reward):
+            print(f"NaN reward! prev: {prev_exec_time}, current: {self.current_exec_time}")
 
         observation = self._get_obs()
         # return observation, reward, terminated, truncated and info
