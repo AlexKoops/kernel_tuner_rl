@@ -1,9 +1,10 @@
 from typing import Optional
 import numpy as np
 import gymnasium as gym
+from stable_baselines3.common.env_checker import check_env
 import random
 
-import searchspaceInfo
+from searchspaceInfo import SearchspaceInfo
 
 
 class KernelTunerRLEnv(gym.Env):
@@ -12,15 +13,17 @@ class KernelTunerRLEnv(gym.Env):
 
         self.current_config = None
         self.step_count = None
-        self.initial_exec_time = None
+        self.current_exec_time = None
 
         # percentage of searchspace we will use as a cutoff point in training
         searchspace_percentage = 20
 
-        self.searchspaceInfo = searchspaceInfo(cache_file)
+        self.searchspaceInfo = SearchspaceInfo(cache_file)
 
         # kernel_tuner.Searchspace class has a self.tune_params: dict parameter
         self.number_of_parameters = self.searchspaceInfo.number_of_parameters
+
+        self.param_keys = list(self.searchspaceInfo.tune_params.keys())
 
         # for the max steps we define a set amount, it is set to a percentage of the searchspace size
         self.max_steps = len(self.searchspaceInfo.searchspace) // searchspace_percentage
@@ -42,6 +45,23 @@ class KernelTunerRLEnv(gym.Env):
         # this means that for only one parameter at the time, we increment or decrement the value
         # this gives us 2 moves per parameter, so a total of 2*parameters
         self.action_space = gym.spaces.Discrete(self.number_of_parameters * 2)
+
+    def action_masks(self) -> np.ndarray:
+        mask_list = []
+        for key in self.current_config:
+            index = self.searchspaceInfo.tune_params[key].index(self.current_config[key])
+
+            if index > 0:
+                mask_list.append(True)
+            else:
+                mask_list.append(False)
+
+            if index < len(self.searchspaceInfo.tune_params[key]) - 1:
+                mask_list.append(True)
+            else:
+                mask_list.append(False)
+
+        return np.array(mask_list, dtype=np.bool_)
 
     def _get_obs(self):
         # creates a normalized nparray that represents the observation
@@ -77,9 +97,57 @@ class KernelTunerRLEnv(gym.Env):
 
         self.current_config = random.choice(self.searchspaceInfo.searchspace)
         self.step_count = 0
-        self.initial_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
 
-        return (self._get_obs(), {})
+        return self._get_obs(), {}
 
     def step(self, action):
-        pass
+        # move agent to next config, follpwing the correct direction
+
+        param_index = action // 2  # the parameter where the step will occur
+        direction = action % 2  # the direction the parameter value will step to
+
+        key_to_update = self.param_keys[param_index]
+
+        new_config = self.current_config.copy()
+
+        # get the index for the current parameter setting
+        tune_param_index = self.searchspaceInfo.tune_params[key_to_update].index(new_config[key_to_update])
+        prev_exec_time = self.current_exec_time
+
+        if direction == 0 and tune_param_index == 0:
+            # can't step down, stay in place
+            new_config = self.current_config.copy()
+        elif direction == 1 and tune_param_index == len(self.searchspaceInfo.tune_params[key_to_update]) - 1:
+            # can't step up, stay in place
+            new_config = self.current_config.copy()
+        elif direction == 0:
+            new_config[key_to_update] = self.searchspaceInfo.tune_params[key_to_update][tune_param_index - 1]
+        else:
+            new_config[key_to_update] = self.searchspaceInfo.tune_params[key_to_update][tune_param_index + 1]
+
+        # set new config
+        self.current_config = new_config
+
+        self.step_count += 1
+
+        # termination only happens on truncation since we use a max step count and there is no objective to find in searchspace
+        terminated = False
+
+        # check if truncated
+        if self.step_count > self.max_steps:
+            truncated = True
+        else:
+            truncated = False
+
+        # get reward, based on current and new exec_time
+
+        self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        diff = prev_exec_time - self.current_exec_time
+
+        reward = diff
+
+        observation = self._get_obs()
+        # return observation, reward, terminated, truncated and info
+
+        return observation, reward, terminated, truncated, {}

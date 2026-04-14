@@ -6,9 +6,7 @@ class SearchspaceInfo:
         # seachspace is the cartesian product of all tune_param options
         # cache is a dictionary with all configurations and its exec time
         # tune_params is a dict of all tuneable parameters paired with a list of valid values
-        self.searchspace, self.cache, self.tune_params = cache_to_searchSpaceInfo(
-            cache_file
-        )
+        self.searchspace, self.cache, self.tune_params = cache_to_searchSpaceInfo(cache_file)
         self.number_of_parameters = len(self.tune_params)
         self.neighbours = {}
 
@@ -38,4 +36,7 @@ class SearchspaceInfo:
 
     def _get_config_exec_time(self, config):
         cache_key = ",".join(str(v) for v in config.values())
-        return self.cache[cache_key]["time"]
+        time = self.cache[cache_key]["time"]
+        if isinstance(time, str):
+            return float("inf")
+        return time
