@@ -23,12 +23,15 @@ class SearchspaceInfo:
                 if index > 0:  # there is a valid parameter option smaller then current
                     neighbour = config.copy()
                     neighbour[key] = tune_params[key][index - 1]
-                    local_neighbours.append(neighbour)
-                # there is a valid parameter option bigger then current
+                    neighbour_key = ",".join(str(v) for v in neighbour.values())
+                    if neighbour_key in self.cache:
+                        local_neighbours.append(neighbour)  # there is a valid parameter option bigger then current
                 if index < len(tune_params[key]) - 1:
                     neighbour = config.copy()
                     neighbour[key] = tune_params[key][index + 1]
-                    local_neighbours.append(neighbour)
+                    neighbour_key = ",".join(str(v) for v in neighbour.values())
+                    if neighbour_key in self.cache:
+                        local_neighbours.append(neighbour)
 
             neighbours[tuple(config.values())] = local_neighbours
 

@@ -51,13 +51,23 @@ class KernelTunerRLEnv(gym.Env):
         for key in self.current_config:
             index = self.searchspaceInfo.tune_params[key].index(self.current_config[key])
 
+            cache = self.searchspaceInfo.cache
+
             if index > 0:
-                mask_list.append(True)
+                # Create neighbour to check if it is not a restricted config
+                neighbour = self.current_config.copy()
+                neighbour[key] = self.searchspaceInfo.tune_params[key][index - 1]
+                neighbour_key = ",".join(str(v) for v in neighbour.values())
+                mask_list.append(neighbour_key in cache)
             else:
                 mask_list.append(False)
 
             if index < len(self.searchspaceInfo.tune_params[key]) - 1:
-                mask_list.append(True)
+                # Create neighbour to check if it is not a restricted config
+                neighbour = self.current_config.copy()
+                neighbour[key] = self.searchspaceInfo.tune_params[key][index + 1]
+                neighbour_key = ",".join(str(v) for v in neighbour.values())
+                mask_list.append(neighbour_key in cache)
             else:
                 mask_list.append(False)
 
@@ -115,12 +125,15 @@ class KernelTunerRLEnv(gym.Env):
         tune_param_index = self.searchspaceInfo.tune_params[key_to_update].index(new_config[key_to_update])
         prev_exec_time = self.current_exec_time
 
+        # first 2 if elif statements are only added for check_env() to be able to pass, since this does not support action maskign
         if direction == 0 and tune_param_index == 0:
             # can't step down, stay in place
             new_config = self.current_config.copy()
         elif direction == 1 and tune_param_index == len(self.searchspaceInfo.tune_params[key_to_update]) - 1:
             # can't step up, stay in place
             new_config = self.current_config.copy()
+
+        # these 2 are the only ifs that should trigger when action masking class is used
         elif direction == 0:
             new_config[key_to_update] = self.searchspaceInfo.tune_params[key_to_update][tune_param_index - 1]
         else:
@@ -151,3 +164,8 @@ class KernelTunerRLEnv(gym.Env):
         # return observation, reward, terminated, truncated and info
 
         return observation, reward, terminated, truncated, {}
+
+
+if __name__ == "__main__":
+    env = KernelTunerRLEnv("cache/convolution_milo/A4000.json.gz")
+    check_env(env)
