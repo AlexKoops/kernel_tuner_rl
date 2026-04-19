@@ -36,6 +36,8 @@ class KernelTunerRLEnv(gym.Env):
         )
         print(f"max_exec_time: {self.max_exec_time}")
 
+        self.best_seen_exec_time = self.current_exec_time
+
         # The observation or state space for this environment is defined as follows:
         #   * current kernel configuration
         #   * the performance of the current kernel configuration, hence the ( + 1) in the shape
@@ -104,7 +106,7 @@ class KernelTunerRLEnv(gym.Env):
 
     def _get_info(self):
         # Generate extra info for debugging purposes
-        pass
+        return {"best_seen_exec_time": self.best_seen_exec_time}
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
@@ -115,8 +117,9 @@ class KernelTunerRLEnv(gym.Env):
         self.current_config = random.choice(self.searchspaceInfo.searchspace)
         self.step_count = 0
         self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        self.best_seen_exec_time = self.current_exec_time
 
-        return self._get_obs(), {}
+        return self._get_obs(), self._get_info()
 
     def step(self, action):
         # move agent to next config, follpwing the correct direction
@@ -167,6 +170,8 @@ class KernelTunerRLEnv(gym.Env):
 
         self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
         self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
+        if self.current_exec_time < self.best_seen_exec_time:
+            self.best_seen_exec_time = self.current_exec_time
         diff = prev_exec_time - self.current_exec_time
 
         reward = diff
@@ -174,9 +179,10 @@ class KernelTunerRLEnv(gym.Env):
             print(f"NaN reward! prev: {prev_exec_time}, current: {self.current_exec_time}")
 
         observation = self._get_obs()
+        info = self._get_info()
         # return observation, reward, terminated, truncated and info
 
-        return observation, reward, terminated, truncated, {}
+        return observation, reward, terminated, truncated, info
 
 
 if __name__ == "__main__":
