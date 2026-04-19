@@ -13,7 +13,7 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    env = KernelTunerRLEnv("cache/convolution_milo/A4000.json.gz")
+    env = KernelTunerRLEnv("clean_cache/convolution_milo/A4000.json.gz")
     env = ActionMasker(env, mask_fn)
 
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1)

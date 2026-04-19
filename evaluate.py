@@ -11,7 +11,7 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     return env.action_masks()
 
 
-env = KernelTunerRLEnv("cache/convolution_milo/A4000.json.gz")
+env = KernelTunerRLEnv("clean_cache/convolution_milo/A4000.json.gz")
 env = ActionMasker(env, mask_fn)
 
 model = MaskablePPO.load("models/ppo_kernel_tuner")
