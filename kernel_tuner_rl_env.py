@@ -16,7 +16,7 @@ class KernelTunerRLEnv(gym.Env):
         self.current_exec_time = None
 
         # percentage of searchspace we will use as a cutoff point in training
-        searchspace_percentage = 20
+        searchspace_percentage = 40
 
         self.searchspaceInfo = SearchspaceInfo(cache_file)
 
@@ -26,24 +26,37 @@ class KernelTunerRLEnv(gym.Env):
         self.param_keys = list(self.searchspaceInfo.tune_params.keys())
 
         # for the max steps we define a set amount, it is set to a percentage of the searchspace size
-        self.max_steps = len(self.searchspaceInfo.searchspace) // searchspace_percentage
 
-        # highest config execution time, will be used for the normalization
-        self.max_exec_time = max(
+        # self.max_steps = len(self.searchspaceInfo.searchspace) // searchspace_percentage
+        self.max_steps = 100
+
+        finite_exec_times = [
             t
             for t in (self.searchspaceInfo._get_config_exec_time(c) for c in self.searchspaceInfo.searchspace)
             if t != float("inf")
-        )
-        print(f"max_exec_time: {self.max_exec_time}")
+        ]
+
+        # highest config execution time, will be used for the normalization
+        self.max_exec_time = float(np.percentile(finite_exec_times, 95))
+        # the optimum exectution time, will be used to calculate rewards
+        self.optimum_exec_time = float(min(finite_exec_times))
+
+        print(f"max_exec_time (95th pct): {self.max_exec_time}")
+        print(f"optimum_exec_time: {self.optimum_exec_time}")
 
         self.best_seen_exec_time = self.current_exec_time
 
+        self.best_seen_config = None
+
         # The observation or state space for this environment is defined as follows:
         #   * current kernel configuration
-        #   * the performance of the current kernel configuration, hence the ( + 1) in the shape
+        #   * best seen kernel configuration
+        #   * the performance of the current kernel configuration
+        #   * best_seen_exec_time
+        #   * step progress = step_count/max_steps
         #   * the high is set to 1.0 since the parameter values and exec time will be normalized
         self.observation_space = gym.spaces.Box(
-            low=0, high=1.0, shape=(self.number_of_parameters + 1,), dtype=np.float32
+            low=0, high=1.0, shape=(self.number_of_parameters * 2 + 3,), dtype=np.float32
         )
 
         # for the action space we use single incremental steps,
@@ -78,29 +91,38 @@ class KernelTunerRLEnv(gym.Env):
 
         return np.array(mask_list, dtype=np.bool_)
 
+    def _normalize_config(self, config):
+        normalized = []
+        for key in config:
+            index = self.searchspaceInfo.tune_params[key].index(config[key])
+            tune_param_length = len(self.searchspaceInfo.tune_params[key])
+            if tune_param_length == 1:
+                normalized.append(0.0)
+            else:
+                normalized.append(index / (tune_param_length - 1))
+        return normalized
+
+    def _normalize_exec_time(self, exec_time):
+        if exec_time == float("inf"):
+            return 1.0
+
+        return min(exec_time / self.max_exec_time, 1.0)
+
     def _get_obs(self):
         # creates a normalized nparray that represents the observation
         normalized_list = []
-        # create the normalized parameters first
-        for key in self.current_config:
-            index = self.searchspaceInfo.tune_params[key].index(self.current_config[key])
-            tune_param_length = len(self.searchspaceInfo.tune_params[key])
 
-            # prevent devision by zero
-            if tune_param_length == 1:
-                normalized_param = 0.0
-            else:
-                normalized_param = index / (tune_param_length - 1)
+        # add current config and best seen config
+        normalized_list.extend(self._normalize_config(self.current_config))
+        normalized_list.extend(self._normalize_config(self.best_seen_config))
 
-            normalized_list.append(normalized_param)
+        # add the execution times
+        current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        normalized_list.append(self._normalize_exec_time(current_exec_time))
+        normalized_list.append(self._normalize_exec_time(self.best_seen_exec_time))
 
-        # append the normalized exec time at the end
-        exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
-        if exec_time == float("inf"):
-            normalized_exec_time = 1.0
-        else:
-            normalized_exec_time = exec_time / self.max_exec_time
-        normalized_list.append(normalized_exec_time)
+        # add the point in time, based on the step_count
+        normalized_list.append(min(self.step_count / self.max_steps, 1.0))
 
         return np.array(normalized_list, dtype=np.float32)
 
@@ -117,7 +139,12 @@ class KernelTunerRLEnv(gym.Env):
         self.current_config = random.choice(self.searchspaceInfo.searchspace)
         self.step_count = 0
         self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+
+        # Clamp in case starting config is restricted (inf exec time)
+        self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
         self.best_seen_exec_time = self.current_exec_time
+
+        self.best_seen_config = self.current_config.copy()
 
         return self._get_obs(), self._get_info()
 
@@ -172,9 +199,18 @@ class KernelTunerRLEnv(gym.Env):
         self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
         if self.current_exec_time < self.best_seen_exec_time:
             self.best_seen_exec_time = self.current_exec_time
-        diff = prev_exec_time - self.current_exec_time
 
-        reward = diff
+            self.best_seen_config = self.current_config.copy()
+
+        # Potential-Based Reward Shaping
+        alpha = 0.2
+
+        diff = self.optimum_exec_time / self.current_exec_time
+
+        log_improvement = np.log(prev_exec_time / self.current_exec_time)
+
+        reward = diff + alpha * log_improvement
+
         if np.isnan(reward):
             print(f"NaN reward! prev: {prev_exec_time}, current: {self.current_exec_time}")
 

@@ -16,7 +16,7 @@ if __name__ == "__main__":
     env = KernelTunerRLEnv("clean_cache/convolution_milo/A4000.json.gz")
     env = ActionMasker(env, mask_fn)
 
-    model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1)
+    model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1, ent_coef=0.01)
     model.learn(total_timesteps=150_000)
 
     model.save("models/ppo_kernel_tuner")
