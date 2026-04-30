@@ -6,8 +6,8 @@ import numpy as np
 from sb3_contrib.ppo_mask import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
 
-from kernel_tuner_rl_env import KernelTunerRLEnv
-from cache_picker import choose_cache_file
+from kernel_tuner_rl.env import KernelTunerRLEnv
+from kernel_tuner_rl.cache_picker import choose_cache_file
 
 
 def mask_fn(env: gym.Env) -> np.ndarray:

@@ -13,8 +13,8 @@ from stable_baselines3.common.results_plotter import plot_results
 from stable_baselines3.common import results_plotter
 from sb3_contrib.common.wrappers import ActionMasker
 
-from kernel_tuner_rl_env import KernelTunerRLEnv
-from cache_picker import choose_cache_file
+from kernel_tuner_rl.env import KernelTunerRLEnv
+from kernel_tuner_rl.cache_picker import choose_cache_file
 
 
 def mask_fn(env: gym.Env) -> np.ndarray:
@@ -54,4 +54,6 @@ if __name__ == "__main__":
     plot_results([log_dir], 100_000, results_plotter.X_TIMESTEPS, "PPO kernel env")
     plt.show()
 
-    model.save("models/ppo_kernel_tuner")
+    save_dir = "models/"
+    os.makedirs(save_dir, exist_ok=True)
+    model.save(Path(save_dir) / "ppo_kernel_tuner")

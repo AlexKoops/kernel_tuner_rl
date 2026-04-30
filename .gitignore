@@ -1,1 +1,6 @@
 .venv/
+models/
+.env
+__pycache__/
+cache/
+tmp/

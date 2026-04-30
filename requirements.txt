@@ -3,3 +3,4 @@ gymnasium
 sb3-contrib
 stable_baselines3
 matplotlib
+questionary

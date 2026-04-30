@@ -1,0 +1,16 @@
+[project]
+name = "kernel-tuner-rl"
+version = "0.1.0"
+description = "Reinforcement learning for GPU kernel parameter tuning"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "gymnasium",
+    "sb3-contrib",
+    "stable_baselines3",
+    "matplotlib",
+    "questionary",
+]
+
+[tool.black]
+line-length = 150

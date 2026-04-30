@@ -4,7 +4,7 @@ import gymnasium as gym
 from stable_baselines3.common.env_checker import check_env
 import random
 
-from searchspaceInfo import SearchspaceInfo
+from kernel_tuner_rl.searchspace import SearchspaceInfo
 
 
 class KernelTunerRLEnv(gym.Env):
@@ -205,7 +205,7 @@ class KernelTunerRLEnv(gym.Env):
 
         # Potential-Based Reward Shaping
         alpha = 0.2
-        k = 2
+        # k = 2
 
         closeness = self.optimum_exec_time / self.current_exec_time
 

@@ -1,4 +1,4 @@
-from utils import cache_to_searchSpaceInfo
+from kernel_tuner_rl.utils import cache_to_searchSpaceInfo
 
 
 class SearchspaceInfo:
