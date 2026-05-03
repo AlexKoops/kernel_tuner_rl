@@ -12,5 +12,9 @@ dependencies = [
     "questionary",
 ]
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["kernel_tuner_rl*"]
+
 [tool.black]
 line-length = 150

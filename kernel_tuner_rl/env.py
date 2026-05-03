@@ -14,6 +14,7 @@ class KernelTunerRLEnv(gym.Env):
         self.current_config = None
         self.step_count = None
         self.current_exec_time = None
+        self.gamma = 0.999
 
         # percentage of searchspace we will use as a cutoff point in training
         searchspace_percentage = 0.1
@@ -185,11 +186,8 @@ class KernelTunerRLEnv(gym.Env):
 
         self.step_count += 1
 
-        # termination only happens on truncation since we use a max step count and there is no objective to find in searchspace
-        terminated = self.current_exec_time == self.optimum_exec_time
-
         # check if truncated
-        if self.step_count > self.max_steps:
+        if self.step_count >= self.max_steps:
             truncated = True
         else:
             truncated = False
@@ -203,15 +201,16 @@ class KernelTunerRLEnv(gym.Env):
 
             self.best_seen_config = self.current_config.copy()
 
+        # termination only happens on truncation since we use a max step count and there is no objective to find in searchspace
+        terminated = self.current_exec_time == self.optimum_exec_time
+
         # Potential-Based Reward Shaping
-        alpha = 0.2
-        # k = 2
+        # Based on Ng at al (1999): Policy Invariance Under Reward Transformations: Theory and Application to Reward Shaping
 
-        closeness = self.optimum_exec_time / self.current_exec_time
+        phi_current = self.optimum_exec_time / self.current_exec_time
+        phi_prev = self.optimum_exec_time / prev_exec_time
 
-        improvement = np.log(prev_exec_time / self.current_exec_time)
-
-        reward = closeness + alpha * improvement
+        reward = self.gamma * phi_current - phi_prev
 
         if np.isnan(reward):
             print(f"NaN reward! prev: {prev_exec_time}, current: {self.current_exec_time}")
