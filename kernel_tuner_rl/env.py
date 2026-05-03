@@ -4,12 +4,12 @@ import gymnasium as gym
 from stable_baselines3.common.env_checker import check_env
 import random
 
-from kernel_tuner_rl.searchspace import SearchspaceInfo
-
 
 class KernelTunerRLEnv(gym.Env):
-    def __init__(self, cache_file):
+    def __init__(self, backend):
         super().__init__()
+
+        self.backend = backend
 
         self.current_config = None
         self.step_count = None
@@ -19,31 +19,28 @@ class KernelTunerRLEnv(gym.Env):
         # percentage of searchspace we will use as a cutoff point in training
         searchspace_percentage = 0.1
 
-        self.searchspaceInfo = SearchspaceInfo(cache_file)
+        self.param_keys = list(backend.get_tune_params_dict().keys())
 
         # kernel_tuner.Searchspace class has a self.tune_params: dict parameter
-        self.number_of_parameters = self.searchspaceInfo.number_of_parameters
-
-        self.param_keys = list(self.searchspaceInfo.tune_params.keys())
+        self.number_of_parameters = len(self.param_keys)
 
         # for the max steps we define a set amount, it is set to a percentage of the searchspace size
 
-        self.max_steps = len(self.searchspaceInfo.searchspace) * searchspace_percentage
+        self.max_steps = backend.get_searchspace_size() * searchspace_percentage
         # self.max_steps = 100
 
-        finite_exec_times = [
-            t
-            for t in (self.searchspaceInfo._get_config_exec_time(c) for c in self.searchspaceInfo.searchspace)
-            if t != float("inf")
-        ]
+        if backend.has_precomputed_stats:
+            # highest config execution time, will be used for the normalization
+            self.max_exec_time = backend.get_max_exec()
+            # the optimum exectution time, will be used to calculate rewards
+            self.optimum_exec_time = backend.get_opti_exec()
 
-        # highest config execution time, will be used for the normalization
-        self.max_exec_time = float(max(finite_exec_times))
-        # the optimum exectution time, will be used to calculate rewards
-        self.optimum_exec_time = float(min(finite_exec_times))
-
-        print(f"max_exec_time: {self.max_exec_time}")
-        print(f"optimum_exec_time: {self.optimum_exec_time}")
+            print(f"max_exec_time: {self.max_exec_time}")
+            print(f"optimum_exec_time: {self.optimum_exec_time}")
+        else:
+            self.max_exec_time = float("inf")
+            self.optimum_exec_time = None
+            print("Backend has no precomputed stats")
 
         self.best_seen_exec_time = self.current_exec_time
 
@@ -68,26 +65,23 @@ class KernelTunerRLEnv(gym.Env):
 
     def action_masks(self) -> np.ndarray:
         mask_list = []
+        tune_params = self.backend.get_tune_params_dict()
         for key in self.current_config:
-            index = self.searchspaceInfo.tune_params[key].index(self.current_config[key])
-
-            cache = self.searchspaceInfo.cache
+            index = tune_params[key].index(self.current_config[key])
 
             if index > 0:
                 # Create neighbour to check if it is not a restricted config
                 neighbour = self.current_config.copy()
-                neighbour[key] = self.searchspaceInfo.tune_params[key][index - 1]
-                neighbour_key = ",".join(str(v) for v in neighbour.values())
-                mask_list.append(neighbour_key in cache)
+                neighbour[key] = tune_params[key][index - 1]
+                mask_list.append(self.backend.is_valid(neighbour))
             else:
                 mask_list.append(False)
 
-            if index < len(self.searchspaceInfo.tune_params[key]) - 1:
+            if index < len(tune_params[key]) - 1:
                 # Create neighbour to check if it is not a restricted config
                 neighbour = self.current_config.copy()
-                neighbour[key] = self.searchspaceInfo.tune_params[key][index + 1]
-                neighbour_key = ",".join(str(v) for v in neighbour.values())
-                mask_list.append(neighbour_key in cache)
+                neighbour[key] = tune_params[key][index + 1]
+                mask_list.append(self.backend.is_valid(neighbour))
             else:
                 mask_list.append(False)
 
@@ -95,9 +89,10 @@ class KernelTunerRLEnv(gym.Env):
 
     def _normalize_config(self, config):
         normalized = []
+        tune_params = self.backend.get_tune_params_dict()
         for key in config:
-            index = self.searchspaceInfo.tune_params[key].index(config[key])
-            tune_param_length = len(self.searchspaceInfo.tune_params[key])
+            index = tune_params[key].index(config[key])
+            tune_param_length = len(tune_params[key])
             if tune_param_length == 1:
                 normalized.append(0.0)
             else:
@@ -119,7 +114,7 @@ class KernelTunerRLEnv(gym.Env):
         # normalized_list.extend(self._normalize_config(self.best_seen_config))
 
         # add the execution times
-        current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        current_exec_time = self.backend.get_exec_time(self.current_config)
         normalized_list.append(self._normalize_exec_time(current_exec_time))
         # normalized_list.append(self._normalize_exec_time(self.best_seen_exec_time))
 
@@ -138,9 +133,9 @@ class KernelTunerRLEnv(gym.Env):
         if seed is not None:
             random.seed(seed)
 
-        self.current_config = random.choice(self.searchspaceInfo.searchspace)
+        self.current_config = self.backend.get_random_start(seed)
         self.step_count = 0
-        self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        self.current_exec_time = self.backend.get_exec_time(self.current_config)
 
         # Clamp in case starting config is restricted (inf exec time)
         self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
@@ -161,7 +156,8 @@ class KernelTunerRLEnv(gym.Env):
         new_config = self.current_config.copy()
 
         # get the index for the current parameter setting
-        tune_param_index = self.searchspaceInfo.tune_params[key_to_update].index(new_config[key_to_update])
+        tune_params = self.backend.get_tune_params_dict()
+        tune_param_index = tune_params[key_to_update].index(new_config[key_to_update])
         prev_exec_time = self.current_exec_time
 
         # add protection agains exec time becoming inf
@@ -171,15 +167,15 @@ class KernelTunerRLEnv(gym.Env):
         if direction == 0 and tune_param_index == 0:
             # can't step down, stay in place
             new_config = self.current_config.copy()
-        elif direction == 1 and tune_param_index == len(self.searchspaceInfo.tune_params[key_to_update]) - 1:
+        elif direction == 1 and tune_param_index == len(tune_params[key_to_update]) - 1:
             # can't step up, stay in place
             new_config = self.current_config.copy()
 
         # these 2 are the only ifs that should trigger when action masking class is used
         elif direction == 0:
-            new_config[key_to_update] = self.searchspaceInfo.tune_params[key_to_update][tune_param_index - 1]
+            new_config[key_to_update] = tune_params[key_to_update][tune_param_index - 1]
         else:
-            new_config[key_to_update] = self.searchspaceInfo.tune_params[key_to_update][tune_param_index + 1]
+            new_config[key_to_update] = tune_params[key_to_update][tune_param_index + 1]
 
         # set new config
         self.current_config = new_config
@@ -194,23 +190,28 @@ class KernelTunerRLEnv(gym.Env):
 
         # get reward, based on current and new exec_time
 
-        self.current_exec_time = self.searchspaceInfo._get_config_exec_time(self.current_config)
+        self.current_exec_time = self.backend.get_exec_time(self.current_config)
         self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
         if self.current_exec_time < self.best_seen_exec_time:
             self.best_seen_exec_time = self.current_exec_time
 
             self.best_seen_config = self.current_config.copy()
 
-        # termination only happens on truncation since we use a max step count and there is no objective to find in searchspace
-        terminated = self.current_exec_time == self.optimum_exec_time
+        if self.backend.has_precomputed_stats:
+            terminated = self.current_exec_time == self.optimum_exec_time
+        else:
+            terminated = False
 
         # Potential-Based Reward Shaping
         # Based on Ng at al (1999): Policy Invariance Under Reward Transformations: Theory and Application to Reward Shaping
 
-        phi_current = self.optimum_exec_time / self.current_exec_time
-        phi_prev = self.optimum_exec_time / prev_exec_time
+        if self.backend.has_precomputed_stats:
+            phi_current = self.optimum_exec_time / self.current_exec_time
+            phi_prev = self.optimum_exec_time / prev_exec_time
 
-        reward = self.gamma * phi_current - phi_prev
+            reward = self.gamma * phi_current - phi_prev
+        else:
+            reward = 0.0
 
         if np.isnan(reward):
             print(f"NaN reward! prev: {prev_exec_time}, current: {self.current_exec_time}")

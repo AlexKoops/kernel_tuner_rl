@@ -15,6 +15,7 @@ from sb3_contrib.common.wrappers import ActionMasker
 
 from kernel_tuner_rl.env import KernelTunerRLEnv
 from kernel_tuner_rl.cache_picker import choose_cache_file
+from kernel_tuner_rl.backends import CacheBackend
 
 
 def mask_fn(env: gym.Env) -> np.ndarray:
@@ -44,7 +45,8 @@ if __name__ == "__main__":
     log_dir = "tmp/"
     os.makedirs(log_dir, exist_ok=True)
 
-    env = KernelTunerRLEnv(str(cache_file))
+    backend = CacheBackend(str(cache_file))
+    env = KernelTunerRLEnv(backend)
     env = Monitor(env, log_dir)
     env = ActionMasker(env, mask_fn)
 

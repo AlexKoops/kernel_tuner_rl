@@ -9,6 +9,7 @@ from sb3_contrib.common.wrappers import ActionMasker
 
 from kernel_tuner_rl.env import KernelTunerRLEnv
 from kernel_tuner_rl.cache_picker import choose_cache_file
+from kernel_tuner_rl.backends import CacheBackend
 
 
 def mask_fn(env: gym.Env) -> np.ndarray:
@@ -37,14 +38,13 @@ if __name__ == "__main__":
     start_time = time.time()
     cache_file = resolve_cache_file()
     print(f"Using cache file: {cache_file}")
-    env = KernelTunerRLEnv(str(cache_file))
+    backend = CacheBackend(str(cache_file))
+    env = KernelTunerRLEnv(backend)
     env = ActionMasker(env, mask_fn)
     model = MaskablePPO.load("models/ppo_kernel_tuner")
 
     all_times = sorted(
-        t
-        for t in (env.env.searchspaceInfo._get_config_exec_time(c) for c in env.env.searchspaceInfo.searchspace)
-        if t != float("inf")
+        t for t in (env.env.backend.get_exec_time(c) for c in env.env.backend.searchspace) if t != float("inf")
     )
     actual_best = all_times[0]
     n_configs = len(all_times)
