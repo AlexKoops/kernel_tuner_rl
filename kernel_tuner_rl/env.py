@@ -14,6 +14,7 @@ class KernelTunerRLEnv(gym.Env):
         self.current_config = None
         self.step_count = None
         self.current_exec_time = None
+        self.prev_exec_time = None
         self.gamma = 0.999
 
         # percentage of searchspace we will use as a cutoff point in training
@@ -136,9 +137,8 @@ class KernelTunerRLEnv(gym.Env):
         self.current_config = self.backend.get_random_start(seed)
         self.step_count = 0
         self.current_exec_time = self.backend.get_exec_time(self.current_config)
+        self.prev_exec_time = self.current_exec_time
 
-        # Clamp in case starting config is restricted (inf exec time)
-        self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
         self.best_seen_exec_time = self.current_exec_time
 
         self.best_seen_config = self.current_config.copy()
@@ -158,10 +158,7 @@ class KernelTunerRLEnv(gym.Env):
         # get the index for the current parameter setting
         tune_params = self.backend.get_tune_params_dict()
         tune_param_index = tune_params[key_to_update].index(new_config[key_to_update])
-        prev_exec_time = self.current_exec_time
-
-        # add protection agains exec time becoming inf
-        prev_exec_time = min(prev_exec_time, self.max_exec_time)
+        self.prev_exec_time = self.current_exec_time
 
         # first 2 if elif statements are only added for check_env() to be able to pass, since this does not support action maskign
         if direction == 0 and tune_param_index == 0:
@@ -206,15 +203,15 @@ class KernelTunerRLEnv(gym.Env):
         # Based on Ng at al (1999): Policy Invariance Under Reward Transformations: Theory and Application to Reward Shaping
 
         if self.backend.has_precomputed_stats:
-            phi_current = self.optimum_exec_time / self.current_exec_time
-            phi_prev = self.optimum_exec_time / prev_exec_time
+            phi_current = self.best_seen_exec_time / self.current_exec_time
+            phi_prev = self.best_seen_exec_time / self.prev_exec_time
 
             reward = self.gamma * phi_current - phi_prev
         else:
             reward = 0.0
 
         if np.isnan(reward):
-            print(f"NaN reward! prev: {prev_exec_time}, current: {self.current_exec_time}")
+            print(f"NaN reward! prev: {self.prev_exec_time}, current: {self.current_exec_time}")
 
         observation = self._get_obs()
         info = self._get_info()
