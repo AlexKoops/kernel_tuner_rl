@@ -32,3 +32,7 @@ def cache_to_searchSpaceInfo(cache_file):
         cache_with_exec_time,
         tune_params,
     )
+
+
+def config_to_string(config):
+    return ",".join(str(v) for v in config.values())
