@@ -1,4 +1,5 @@
 import argparse
+import time
 from pathlib import Path
 
 import gymnasium as gym
@@ -30,9 +31,10 @@ def resolve_cache_file() -> Path:
     return selected
 
 
-N_EPISODES = 50
+N_EPISODES = 5
 
 if __name__ == "__main__":
+    start_time = time.time()
     cache_file = resolve_cache_file()
     print(f"Using cache file: {cache_file}")
     env = KernelTunerRLEnv(str(cache_file))
@@ -103,3 +105,5 @@ if __name__ == "__main__":
     print(f"Std across episodes:       {per_episode_best.std():.4f}ms")
     print()
     print(f"Best config found: {overall_best_config}")
+    print()
+    print("--- %s seconds ---" % (time.time() - start_time))

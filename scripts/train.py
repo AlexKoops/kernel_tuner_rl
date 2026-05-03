@@ -48,10 +48,10 @@ if __name__ == "__main__":
     env = Monitor(env, log_dir)
     env = ActionMasker(env, mask_fn)
 
-    model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1, clip_range=0.3, ent_coef=0.01)
-    model.learn(total_timesteps=100_000)
+    model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1, gamma=0.999, clip_range=0.2, ent_coef=0.01)
+    model.learn(total_timesteps=200_000)
 
-    plot_results([log_dir], 100_000, results_plotter.X_TIMESTEPS, "PPO kernel env")
+    plot_results([log_dir], 200_000, results_plotter.X_EPISODES, "PPO kernel env")
     plt.show()
 
     save_dir = "models/"
