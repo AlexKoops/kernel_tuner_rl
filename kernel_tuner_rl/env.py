@@ -20,9 +20,9 @@ class KernelTunerRLEnv(gym.Env):
         # percentage of searchspace we will use as a cutoff point in training
         searchspace_percentage = 0.1
 
-        self.param_keys = list(backend.get_tune_params_dict().keys())
-
-        # kernel_tuner.Searchspace class has a self.tune_params: dict parameter
+        # collect parameter info
+        self.tune_params = backend.get_tune_params_dict()
+        self.param_keys = list(self.tune_params.keys())
         self.number_of_parameters = len(self.param_keys)
 
         # for the max steps we define a set amount, it is set to a percentage of the searchspace size
@@ -40,7 +40,7 @@ class KernelTunerRLEnv(gym.Env):
             print(f"optimum_exec_time: {self.optimum_exec_time}")
         else:
             self.max_exec_time = float("inf")
-            self.optimum_exec_time = None
+            self.optimum_exec_time = 0.0
             print("Backend has no precomputed stats")
 
         self.best_seen_exec_time = self.current_exec_time
@@ -49,9 +49,7 @@ class KernelTunerRLEnv(gym.Env):
 
         # The observation or state space for this environment is defined as follows:
         #   * current kernel configuration
-        #   * best seen kernel configuration
-        #   * the performance of the current kernel configuration
-        #   * best_seen_exec_time
+        #   * current kernel configuration exec time
         #   * step progress = step_count/max_steps
         #   * the high is set to 1.0 since the parameter values and exec time will be normalized
         self.observation_space = gym.spaces.Box(
@@ -66,7 +64,7 @@ class KernelTunerRLEnv(gym.Env):
 
     def action_masks(self) -> np.ndarray:
         mask_list = []
-        tune_params = self.backend.get_tune_params_dict()
+        tune_params = self.tune_params
         for key in self.current_config:
             index = tune_params[key].index(self.current_config[key])
 
@@ -90,7 +88,7 @@ class KernelTunerRLEnv(gym.Env):
 
     def _normalize_config(self, config):
         normalized = []
-        tune_params = self.backend.get_tune_params_dict()
+        tune_params = self.tune_params
         for key in config:
             index = tune_params[key].index(config[key])
             tune_param_length = len(tune_params[key])
@@ -104,7 +102,7 @@ class KernelTunerRLEnv(gym.Env):
         if exec_time == float("inf"):
             return 1.0
 
-        return min(exec_time / self.max_exec_time, 1.0)
+        return min(self.best_seen_exec_time / exec_time, 1.0)
 
     def _get_obs(self):
         # creates a normalized nparray that represents the observation
@@ -112,12 +110,10 @@ class KernelTunerRLEnv(gym.Env):
 
         # add current config and best seen config
         normalized_list.extend(self._normalize_config(self.current_config))
-        # normalized_list.extend(self._normalize_config(self.best_seen_config))
 
         # add the execution times
-        current_exec_time = self.backend.get_exec_time(self.current_config)
+        current_exec_time = self.current_exec_time
         normalized_list.append(self._normalize_exec_time(current_exec_time))
-        # normalized_list.append(self._normalize_exec_time(self.best_seen_exec_time))
 
         # add the point in time, based on the step_count
         normalized_list.append(min(self.step_count / self.max_steps, 1.0))
@@ -140,7 +136,6 @@ class KernelTunerRLEnv(gym.Env):
         self.prev_exec_time = self.current_exec_time
 
         self.best_seen_exec_time = self.current_exec_time
-
         self.best_seen_config = self.current_config.copy()
 
         return self._get_obs(), self._get_info()
@@ -156,7 +151,7 @@ class KernelTunerRLEnv(gym.Env):
         new_config = self.current_config.copy()
 
         # get the index for the current parameter setting
-        tune_params = self.backend.get_tune_params_dict()
+        tune_params = self.tune_params
         tune_param_index = tune_params[key_to_update].index(new_config[key_to_update])
         self.prev_exec_time = self.current_exec_time
 
@@ -188,7 +183,6 @@ class KernelTunerRLEnv(gym.Env):
         # get reward, based on current and new exec_time
 
         self.current_exec_time = self.backend.get_exec_time(self.current_config)
-        self.current_exec_time = min(self.current_exec_time, self.max_exec_time)
         if self.current_exec_time < self.best_seen_exec_time:
             self.best_seen_exec_time = self.current_exec_time
 
@@ -208,7 +202,7 @@ class KernelTunerRLEnv(gym.Env):
 
             reward = self.gamma * phi_current - phi_prev
         else:
-            reward = 0.0
+            reward = 0.0  # if no precomputed stats, the agent is deployed so no reward needed since no training
 
         if np.isnan(reward):
             print(f"NaN reward! prev: {self.prev_exec_time}, current: {self.current_exec_time}")
