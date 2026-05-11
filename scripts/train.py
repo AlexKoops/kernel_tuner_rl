@@ -47,14 +47,15 @@ if __name__ == "__main__":
 
     backend = CacheBackend(str(cache_file))
     env = KernelTunerRLEnv(backend)
-    env = Monitor(env, log_dir)
+    env = Monitor(
+        env,
+        log_dir,
+        info_keywords=("best_seen_exec_time", "terminated_at_optimum"),
+    )
     env = ActionMasker(env, mask_fn)
 
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1, gamma=0.999, clip_range=0.2, ent_coef=0.01)
     model.learn(total_timesteps=200_000)
-
-    plot_results([log_dir], 200_000, results_plotter.X_EPISODES, "PPO kernel env")
-    plt.show()
 
     save_dir = "models/"
     os.makedirs(save_dir, exist_ok=True)

@@ -35,7 +35,6 @@ def resolve_cache_file() -> Path:
 N_EPISODES = 5
 
 if __name__ == "__main__":
-    start_time = time.time()
     cache_file = resolve_cache_file()
     print(f"Using cache file: {cache_file}")
     backend = CacheBackend(str(cache_file))
@@ -47,7 +46,11 @@ if __name__ == "__main__":
         t for t in (env.env.backend.get_exec_time(c) for c in env.env.backend.searchspace) if t != float("inf")
     )
     actual_best = all_times[0]
+    median_exec_time = np.median(all_times)
+    scale = median_exec_time - actual_best
     n_configs = len(all_times)
+
+    start_time = time.time()  # start timing from RL part
 
     per_episode_best = []
     per_episode_percentile = []
@@ -60,10 +63,7 @@ if __name__ == "__main__":
         truncated = False
         terminated = False
         while not truncated and not terminated:
-            action, _ = model.predict(
-                obs,
-                action_masks=env.action_masks(),
-            )
+            action, _ = model.predict(obs, action_masks=env.action_masks(), deterministic=True)
             obs, reward, terminated, truncated, info = env.step(action)
 
         ep_best = env.env.best_seen_exec_time
@@ -76,11 +76,13 @@ if __name__ == "__main__":
             overall_best_exec_time = ep_best
             overall_best_config = env.env.best_seen_config.copy()
 
+    end_time = time.time() - start_time
+
     per_episode_best = np.array(per_episode_best)
     per_episode_percentile = np.array(per_episode_percentile)
 
-    gaps = (per_episode_best - actual_best) / actual_best * 100
-    overall_gap = (overall_best_exec_time - actual_best) / actual_best * 100
+    gaps = (per_episode_best - actual_best) / scale * 100
+    overall_gap = (overall_best_exec_time - actual_best) / scale * 100
 
     overall_n_better = sum(1 for t in all_times if t < overall_best_exec_time)
     overall_percentile = overall_n_better / n_configs * 100
@@ -91,6 +93,7 @@ if __name__ == "__main__":
     print("------------------------------------")
     print()
     print(f"Cache optimum:             {actual_best:.4f}ms")
+    print(f"Search space median:       {median_exec_time:.4f}ms")
     print(f"Search space size:         {n_configs} configs")
     print()
     print(
@@ -106,4 +109,4 @@ if __name__ == "__main__":
     print()
     print(f"Best config found: {overall_best_config}")
     print()
-    print("--- %s seconds ---" % (time.time() - start_time))
+    print("--- %s seconds ---" % end_time)
