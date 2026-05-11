@@ -197,10 +197,15 @@ class KernelTunerRLEnv(gym.Env):
         # Based on Ng at al (1999): Policy Invariance Under Reward Transformations: Theory and Application to Reward Shaping
 
         if self.backend.has_precomputed_stats:
+            # Reflect the objective directly
+            R_true = 1.0 if terminated else 0.0
+
+            # add Potential-Based shaping to the reward
             phi_current = self.best_seen_exec_time / self.current_exec_time
             phi_prev = self.best_seen_exec_time / self.prev_exec_time
+            shaping = self.gamma * phi_current - phi_prev
 
-            reward = self.gamma * phi_current - phi_prev
+            reward = R_true + shaping
         else:
             reward = 0.0  # if no precomputed stats, the agent is deployed so no reward needed since no training
 
@@ -209,6 +214,7 @@ class KernelTunerRLEnv(gym.Env):
 
         observation = self._get_obs()
         info = self._get_info()
+        info["terminated_at_optimum"] = terminated
         # return observation, reward, terminated, truncated and info
 
         return observation, reward, terminated, truncated, info

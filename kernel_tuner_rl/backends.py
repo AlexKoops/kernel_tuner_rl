@@ -4,7 +4,6 @@ import random
 
 from kernel_tuner.searchspace import Searchspace
 from kernel_tuner.runners.runner import Runner
-from kernel_tuner.util import ErrorConfig
 
 from kernel_tuner_rl.utils import cache_to_searchSpaceInfo, config_to_string
 
@@ -74,7 +73,7 @@ class CacheBackend(Backend):
         #     "16,1",
         #     "16,2"
         # }
-        self.valid_configs = set(self.searchspace)
+        self.valid_configs = {config_to_string(c) for c in self.searchspace}
 
     @property
     def has_precomputed_stats(self):
@@ -100,7 +99,8 @@ class CacheBackend(Backend):
     #
     # output: bool
     def is_valid(self, config):
-        return config in self.valid_configs
+        config_str = config_to_string(config)
+        return config_str in self.valid_configs
 
     # output: dict of parameter options and their configs
     # example: {"block_size": 16, "tile_size": 1}
@@ -157,7 +157,7 @@ class KernelTunerBackend(Backend):
         result = self.runner.run([config_tuple], self.tune_options)
 
         exec_time = result[0][self.tune_options.objective]
-        if exec_time == ErrorConfig:
+        if not isinstance(exec_time, float):
             return float("inf")
 
         self.runner_results.append(result[0])

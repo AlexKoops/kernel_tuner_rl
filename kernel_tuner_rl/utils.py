@@ -35,4 +35,5 @@ def cache_to_searchSpaceInfo(cache_file):
 
 
 def config_to_string(config):
-    return ",".join(str(v) for v in config.values())
+    values = config.values() if isinstance(config, dict) else config
+    return ",".join(str(v) for v in values)
