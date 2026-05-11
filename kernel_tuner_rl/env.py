@@ -201,8 +201,8 @@ class KernelTunerRLEnv(gym.Env):
             R_true = 1.0 if terminated else 0.0
 
             # add Potential-Based shaping to the reward
-            phi_current = self.best_seen_exec_time / self.current_exec_time
-            phi_prev = self.best_seen_exec_time / self.prev_exec_time
+            phi_current = self.optimum_exec_time / self.current_exec_time
+            phi_prev = self.optimum_exec_time / self.prev_exec_time
             shaping = self.gamma * phi_current - phi_prev
 
             reward = R_true + shaping
