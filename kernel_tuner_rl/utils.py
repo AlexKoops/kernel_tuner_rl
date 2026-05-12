@@ -1,5 +1,6 @@
 import json
 import gzip
+from pathlib import Path
 
 
 def load_json(file):
@@ -37,3 +38,15 @@ def cache_to_searchSpaceInfo(cache_file):
 def config_to_string(config):
     values = config.values() if isinstance(config, dict) else config
     return ",".join(str(v) for v in values)
+
+def get_kernel_name(paths):
+    if len(paths) == 1:
+        return paths[0].parent.name
+    
+    parent_name = paths[0].parent.name
+
+    for path in paths[1:]:
+        if parent_name != path.parent.name:
+            raise ValueError("Cache files contain different kernels")
+        
+    return parent_name
