@@ -36,12 +36,9 @@ class KernelTunerRLEnv(gym.Env):
             # the optimum exectution time, will be used to calculate rewards
             self.optimum_exec_time = backend.get_opti_exec()
 
-            print(f"max_exec_time: {self.max_exec_time}")
-            print(f"optimum_exec_time: {self.optimum_exec_time}")
         else:
             self.max_exec_time = float("inf")
             self.optimum_exec_time = 0.0
-            print("Backend has no precomputed stats")
 
         self.best_seen_exec_time = self.current_exec_time
 
@@ -55,7 +52,6 @@ class KernelTunerRLEnv(gym.Env):
         self.observation_space = gym.spaces.Box(
             low=0, high=1.0, shape=(self.number_of_parameters + 2,), dtype=np.float32
         )
-        print(f"number of parameters: {self.number_of_parameters}")
 
         # for the action space we use single incremental steps,
         # this means that for only one parameter at the time, we increment or decrement the value
