@@ -1,5 +1,5 @@
 import argparse
-import csv
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -41,6 +41,8 @@ if __name__ == "__main__":
 
     print(df)
 
+    os.makedirs(f"plots/{kernel}/", exist_ok=True)
+
     # first plot showing the gap over timesteps
     timestep_results = df.groupby('timestep')['gap'].agg(['mean', 'std'])
     plt.plot(timestep_results.index, timestep_results['mean'])
@@ -48,7 +50,8 @@ if __name__ == "__main__":
     plt.xlabel('timestep')
     plt.ylabel('gap (%)')
     plt.title('Gap between optimal and median execution time per timestep')
-    plt.show()
+    plt.savefig(f"plots/{kernel}/gap_over_timesteps.png")
+    plt.close()
 
     # second plot
     last_timestep = df[df['timestep'] == df['timestep'].max()]
@@ -59,7 +62,8 @@ if __name__ == "__main__":
     plt.xlabel('gpu')
     plt.ylabel('gap (%)')
     plt.title('Final gap per gpu file')
-    plt.show()
+    plt.savefig(f"plots/{kernel}/final_gap_per_gpu.png")
+    plt.close()
 
 
     # third plot
@@ -78,4 +82,40 @@ if __name__ == "__main__":
     plt.ylabel('gap (%)')
     plt.title('Gap between optimal and median execution time per timestep for both holdout and train gpus')
     plt.legend()
-    plt.show()
+    plt.savefig(f"plots/{kernel}/training_and_holdout_gaps_over_timesteps.png")
+    plt.close()
+
+
+    # Plot 4: Training diagnostics over time
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+    diag = df[df['is_holdout'] == False].groupby('timestep').first().reset_index()
+
+    metrics = [
+        ('entropy',       'Entropy',       axes[0, 0]),
+        ('policy_loss',   'Policy Loss',   axes[0, 1]),
+        ('value_loss',    'Value Loss',    axes[1, 0]),
+        ('clip_fraction', 'Clip Fraction', axes[1, 1]),
+    ]
+
+    for col, label, ax in metrics:
+        ax.plot(diag['timestep'], diag[col])
+        ax.set_xlabel('Timestep')
+        ax.set_ylabel(label)
+        ax.set_title(f'{label} over Training')
+
+    plt.tight_layout()
+    plt.savefig(f"plots/{kernel}/training_diagnostics.png")
+    plt.close()
+
+# Plot 5: Mean episode return over time (across seeds)
+    ep_return = df[df['is_holdout'] == False].groupby('timestep')['mean_ep_return'].agg(['mean', 'std'])
+    plt.plot(ep_return.index, ep_return['mean'], label='mean episode return')
+    plt.fill_between(ep_return.index,
+        (ep_return['mean'] - ep_return['std']).clip(lower=0),
+        ep_return['mean'] + ep_return['std'], alpha=0.3)
+    plt.xlabel('Timestep')
+    plt.ylabel('Return')
+    plt.title('Mean Episode Return over Training')
+    plt.savefig(f"plots/{kernel}/mean_episode_return.png")
+    plt.close()

@@ -27,7 +27,7 @@ class KernelTunerRLEnv(gym.Env):
 
         # for the max steps we define a set amount, it is set to a percentage of the searchspace size
 
-        self.max_steps = backend.get_searchspace_size() * searchspace_percentage
+        self.max_steps = min(1000, backend.get_searchspace_size() * searchspace_percentage)
         # self.max_steps = 100
 
         if backend.has_precomputed_stats:
@@ -40,9 +40,11 @@ class KernelTunerRLEnv(gym.Env):
             self.max_exec_time = float("inf")
             self.optimum_exec_time = 0.0
 
-        self.best_seen_exec_time = self.current_exec_time
+        self.best_seen_exec_time = None
 
         self.best_seen_config = None
+
+        self.episode_start_exec_time = None
 
         # The observation or state space for this environment is defined as follows:
         #   * current kernel configuration
@@ -98,7 +100,7 @@ class KernelTunerRLEnv(gym.Env):
         if exec_time == float("inf"):
             return 1.0
 
-        return min(self.best_seen_exec_time / exec_time, 1.0)
+        return float(self.episode_start_exec_time / (self.episode_start_exec_time + exec_time))
 
     def _get_obs(self):
         # creates a normalized nparray that represents the observation
@@ -130,6 +132,8 @@ class KernelTunerRLEnv(gym.Env):
         self.step_count = 0
         self.current_exec_time = self.backend.get_exec_time(self.current_config)
         self.prev_exec_time = self.current_exec_time
+
+        self.episode_start_exec_time = self.current_exec_time
 
         self.best_seen_exec_time = self.current_exec_time
         self.best_seen_config = self.current_config.copy()

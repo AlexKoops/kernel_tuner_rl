@@ -79,17 +79,28 @@ class CallBack(BaseCallback):
         
         with open(self.save_path, 'w', newline='') as save_file:
             writer = csv.writer(save_file)
-            writer.writerow(["timestep", "gpu", "is_holdout", "episode", "gap", "best_exec_time"])
-
+            writer.writerow([
+                "timestep", "gpu", "is_holdout", "episode", "gap", "best_exec_time",
+                "entropy", "policy_loss", "value_loss", "clip_fraction", "mean_ep_return"
+            ])
 
     def _on_step(self) -> bool:
         if self.num_timesteps % self.eval_freq == 0:
+
+            log = self.model.logger.name_to_value
+            entropy = log.get("train/entropy_loss", None)
+            policy_loss = log.get("train/policy_gradient_loss", None)
+            value_loss = log.get("train/value_loss", None)
+            clip_fraction = log.get("train/clip_fraction", None)
+
+            ep_info = self.model.ep_info_buffer
+            mean_ep_return = np.mean([ep["r"] for ep in ep_info]) if ep_info else None
 
             with open(self.save_path, 'a', newline='') as save_file:
                 writer = csv.writer(save_file)
 
                 all_files = [(f, False) for f in self.train_files] + [(f, True) for f in self.holdout_files]
-                N_EPISODES = 3
+                N_EPISODES = 1
                 for f, is_holdout in all_files:
                     backend = CacheBackend(str(f))
                     env = KernelTunerRLEnv(backend)
@@ -114,7 +125,10 @@ class CallBack(BaseCallback):
                         ep_best = env.env.best_seen_exec_time
                         gap = (ep_best - actual_best) / scale * 100
 
-                        writer.writerow([self.num_timesteps, f.name.split('.')[0], is_holdout, ep, gap, ep_best])
+                        writer.writerow([
+                            self.num_timesteps, f.name.split('.')[0], is_holdout, ep, gap, ep_best,
+                            entropy, policy_loss, value_loss, clip_fraction, mean_ep_return
+                        ])
 
         return True
 
@@ -141,17 +155,18 @@ if __name__ == "__main__":
         e = env.envs[index].env.env
         print(f"\n--- {file.name.split('.')[0]} ---")
         if e.backend.has_precomputed_stats:
-            print(f"Longest Execution Time:  {e.max_exec_time}")
+            print(f"Longest Execution Time: {e.max_exec_time}")
             print(f"Shortest Execution Time: {e.optimum_exec_time}")
-        print(f"Number of Parameters:    {e.number_of_parameters}\n")
+        print(f"Number of Parameters: {e.number_of_parameters}")
+        print(f"Number of Configurations in Search Space: {e.backend.get_searchspace_size()}\n")
 
     results_dir = f"results/{kernel_name}/seed_{seed}/"
     os.makedirs(results_dir, exist_ok=True)
 
     model = MaskablePPO(MaskableActorCriticPolicy, env, seed=seed, verbose=1, gamma=0.999, clip_range=0.2, ent_coef=0.01)
-    myCallback = CallBack(5000, cache_files, holdout_files, results_dir + "eval_results.csv")
+    myCallback = CallBack(25_000, cache_files, holdout_files, results_dir + "eval_results.csv")
     try:
-        model.learn(total_timesteps=300_000, callback=myCallback)
+        model.learn(total_timesteps=2_000_000, callback=myCallback)
     except Exception as e:
         print(f"learn() failed: {e}")
         raise
