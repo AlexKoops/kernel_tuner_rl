@@ -7,7 +7,7 @@ import numpy as np
 from sb3_contrib.ppo_mask import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
 
-from kernel_tuner_rl.env import KernelTunerRLEnv
+from kernel_tuner_rl.discrete_env import KernelTunerRLEnvDiscrete
 from kernel_tuner_rl.cache_picker import choose_cache_file
 from kernel_tuner_rl.backends import CacheBackend
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     for cache_file in cache_files:
         backend = CacheBackend(str(cache_file))
-        env = KernelTunerRLEnv(backend)
+        env = KernelTunerRLEnvDiscrete(backend)
         env = ActionMasker(env, mask_fn)
 
         all_times = sorted(

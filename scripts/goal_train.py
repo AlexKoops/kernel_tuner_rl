@@ -147,7 +147,6 @@ if __name__ == "__main__":
     env = DummyVecEnv([make_env(f, i, desired_speedup) for i, f in enumerate(cache_files)])
  
     for i, f in enumerate(cache_files):
-        # DummyVecEnv -> Monitor -> KernelTunerRLEnvGoal (one fewer unwrap than PPO; no ActionMasker)
         e = env.envs[i].env
         print(f"\n--- {f.name.split('.')[0]} ---")
         if e.backend.has_precomputed_stats:
@@ -158,6 +157,9 @@ if __name__ == "__main__":
  
     results_dir = f"results/{kernel_name}/sac_her_seed_{seed}/"
     os.makedirs(results_dir, exist_ok=True)
+
+    longest_episode = int(max(e.env.max_steps for e in env.envs))
+    learning_starts = env.num_envs * longest_episode + 100
  
     model = SAC(
         policy="MultiInputPolicy",
@@ -167,11 +169,11 @@ if __name__ == "__main__":
             n_sampled_goal=4,
             goal_selection_strategy="future",
         ),
-        learning_starts=1_000,
+        learning_starts=learning_starts,
         buffer_size=200_000,
         batch_size=256,
-        gamma=0.999,
-        tau=0.005,
+        gamma=0.99,
+        tau=0.001,
         learning_rate=3e-4,
         seed=seed,
         verbose=1,

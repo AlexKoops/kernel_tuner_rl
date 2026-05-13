@@ -87,35 +87,35 @@ if __name__ == "__main__":
 
 
     # Plot 4: Training diagnostics over time
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    # fig, axes = plt.subplots(2, 2, figsize=(12, 8))
 
-    diag = df[df['is_holdout'] == False].groupby('timestep').first().reset_index()
+    # diag = df[df['is_holdout'] == False].groupby('timestep').first().reset_index()
 
-    metrics = [
-        ('entropy',       'Entropy',       axes[0, 0]),
-        ('policy_loss',   'Policy Loss',   axes[0, 1]),
-        ('value_loss',    'Value Loss',    axes[1, 0]),
-        ('clip_fraction', 'Clip Fraction', axes[1, 1]),
-    ]
+    # metrics = [
+    #     ('entropy',       'Entropy',       axes[0, 0]),
+    #     ('policy_loss',   'Policy Loss',   axes[0, 1]),
+    #     ('value_loss',    'Value Loss',    axes[1, 0]),
+    #     ('clip_fraction', 'Clip Fraction', axes[1, 1]),
+    # ]
 
-    for col, label, ax in metrics:
-        ax.plot(diag['timestep'], diag[col])
-        ax.set_xlabel('Timestep')
-        ax.set_ylabel(label)
-        ax.set_title(f'{label} over Training')
+    # for col, label, ax in metrics:
+    #     ax.plot(diag['timestep'], diag[col])
+    #     ax.set_xlabel('Timestep')
+    #     ax.set_ylabel(label)
+    #     ax.set_title(f'{label} over Training')
 
-    plt.tight_layout()
-    plt.savefig(f"plots/{kernel}/training_diagnostics.png")
-    plt.close()
+    # plt.tight_layout()
+    # plt.savefig(f"plots/{kernel}/training_diagnostics.png")
+    # plt.close()
 
 # Plot 5: Mean episode return over time (across seeds)
-    ep_return = df[df['is_holdout'] == False].groupby('timestep')['mean_ep_return'].agg(['mean', 'std'])
-    plt.plot(ep_return.index, ep_return['mean'], label='mean episode return')
-    plt.fill_between(ep_return.index,
-        (ep_return['mean'] - ep_return['std']).clip(lower=0),
-        ep_return['mean'] + ep_return['std'], alpha=0.3)
-    plt.xlabel('Timestep')
-    plt.ylabel('Return')
-    plt.title('Mean Episode Return over Training')
-    plt.savefig(f"plots/{kernel}/mean_episode_return.png")
-    plt.close()
+    # ep_return = df[df['is_holdout'] == False].groupby('timestep')['mean_ep_return'].agg(['mean', 'std'])
+    # plt.plot(ep_return.index, ep_return['mean'], label='mean episode return')
+    # plt.fill_between(ep_return.index,
+    #     (ep_return['mean'] - ep_return['std']).clip(lower=0),
+    #     ep_return['mean'] + ep_return['std'], alpha=0.3)
+    # plt.xlabel('Timestep')
+    # plt.ylabel('Return')
+    # plt.title('Mean Episode Return over Training')
+    # plt.savefig(f"plots/{kernel}/mean_episode_return.png")
+    # plt.close()

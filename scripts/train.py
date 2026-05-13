@@ -18,6 +18,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 
 from kernel_tuner_rl.env import KernelTunerRLEnv
+from kernel_tuner_rl.discrete_env import KernelTunerRLEnvDiscrete
 from kernel_tuner_rl.cache_picker import choose_cache_file
 from kernel_tuner_rl.backends import CacheBackend
 from kernel_tuner_rl.utils import get_kernel_name
@@ -58,7 +59,7 @@ def make_env(cache_file, index):
     os.makedirs(log_dir, exist_ok=True)
     def _init():
         backend = CacheBackend(str(cache_file))
-        env = KernelTunerRLEnv(backend)
+        env = KernelTunerRLEnvDiscrete(backend)
         env = Monitor(
             env,
             log_dir,
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     model = MaskablePPO(MaskableActorCriticPolicy, env, seed=seed, verbose=1, gamma=0.999, clip_range=0.2, ent_coef=0.01)
     myCallback = CallBack(25_000, cache_files, holdout_files, results_dir + "eval_results.csv")
     try:
-        model.learn(total_timesteps=2_000_000, callback=myCallback)
+        model.learn(total_timesteps=200_000)
     except Exception as e:
         print(f"learn() failed: {e}")
         raise

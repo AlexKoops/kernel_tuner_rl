@@ -33,6 +33,7 @@ def parse_args():
     parser.add_argument("--train", nargs="+", type=Path, default=None, help="Path(s) to cache file(s) from same kernel")
     parser.add_argument("--holdout", nargs="+", type=Path, default=None, help="Path(s) to holdout cache file(s) for evaluation")
     parser.add_argument("--seed", type=int, default=None, help="Seed for training")
+    parser.add_argument("--total-timesteps", type=int, default=200_000)
     args = parser.parse_args()
 
     holdouts = []
@@ -45,14 +46,14 @@ def parse_args():
         holdouts = args.holdout
 
     if args.train:
-        return args.train, holdouts, seed
+        return args.train, holdouts, seed, args.total_timesteps
 
     selected = choose_cache_file()
     if selected is None:
         print("No cache file selected.")
         raise SystemExit(0)
 
-    return [selected], holdouts, seed
+    return [selected], holdouts, seed, args.total_timesteps
 
 def make_env(cache_file, index):
     log_dir = f"tmp/env_{index}/"
@@ -101,10 +102,10 @@ class CallBack(BaseCallback):
                 writer = csv.writer(save_file)
 
                 all_files = [(f, False) for f in self.train_files] + [(f, True) for f in self.holdout_files]
-                N_EPISODES = 1
+                N_EPISODES = 5
                 for f, is_holdout in all_files:
                     backend = CacheBackend(str(f))
-                    env = KernelTunerRLEnv(backend)
+                    env = KernelTunerRLEnvDiscrete(backend)
                     env = ActionMasker(env, mask_fn)
 
                     all_times = sorted(
@@ -115,7 +116,8 @@ class CallBack(BaseCallback):
                     scale = median_exec_time - actual_best
 
                     for ep in range(N_EPISODES):
-                        obs, info = env.reset(seed=ep)
+                        seed = self.num_timesteps * 1000 + ep
+                        obs, info = env.reset(seed=seed)
                         np.random.seed(ep)
                         truncated = False
                         terminated = False
@@ -135,7 +137,7 @@ class CallBack(BaseCallback):
 
 
 if __name__ == "__main__":
-    cache_files, holdout_files, seed = parse_args()
+    cache_files, holdout_files, seed, total_timesteps = parse_args()
 
     kernel_name = None
     holdout_name = None
@@ -167,7 +169,7 @@ if __name__ == "__main__":
     model = MaskablePPO(MaskableActorCriticPolicy, env, seed=seed, verbose=1, gamma=0.999, clip_range=0.2, ent_coef=0.01)
     myCallback = CallBack(25_000, cache_files, holdout_files, results_dir + "eval_results.csv")
     try:
-        model.learn(total_timesteps=200_000)
+        model.learn(total_timesteps=total_timesteps)
     except Exception as e:
         print(f"learn() failed: {e}")
         raise

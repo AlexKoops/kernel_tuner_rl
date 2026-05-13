@@ -63,9 +63,8 @@ class KernelTunerRLEnvGoal(KernelTunerRLEnvBase):
     def compute_reward(self, achieved_goal, desired_goal, info):
         achieved = np.asarray(achieved_goal, dtype=np.float32).reshape(-1)
         desired = np.asarray(desired_goal, dtype=np.float32).reshape(-1)
-        reached = achieved >= (desired - self.goal_tolerance)
-
-        return np.where(reached, 0.0, -1.0).astype(np.float32)
+        progress = np.minimum(achieved / np.maximum(desired, 1e-12), 1.0)
+        return (progress - 1.0).astype(np.float32)
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed, options=options)
