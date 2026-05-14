@@ -67,7 +67,7 @@ if __name__ == "__main__":
         overall_best_config = None
 
         for ep in range(N_EPISODES):
-            ep_seed = time.time() * 1000 + ep
+            ep_seed = int(time.time() * 1000 + ep)
 
             obs, info = env.reset(seed=ep_seed)
             truncated = False

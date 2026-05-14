@@ -1,5 +1,6 @@
 import gymnasium as gym
 from typing import Optional
+import numpy as np
 import random
 from abc import abstractmethod
 
@@ -59,7 +60,15 @@ class KernelTunerRLEnvBase(gym.Env):
     def _normalize_exec_time(self, exec_time):
         if exec_time == float("inf"):
             return 1.0
-
+        if self.backend.has_precomputed_stats:
+            span = self.max_exec_time - self.optimum_exec_time
+            if span <= 0:
+                return 0.0
+            return float(np.clip(
+                (exec_time - self.optimum_exec_time) / span,
+                0.0, 1.0,
+            ))
+        # Deployment fallback (no precomputed stats): keep the old behavior
         return float(self.episode_start_exec_time / (self.episode_start_exec_time + exec_time))
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
