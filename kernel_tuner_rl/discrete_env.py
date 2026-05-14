@@ -12,7 +12,7 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
         #   * step progress = step_count/max_steps
         #   * the high is set to 1.0 since the parameter values and exec time will be normalized
         self.observation_space = gym.spaces.Box(
-            low=0, high=1.0, shape=(self.number_of_parameters + 2,), dtype=np.float32
+            low=0, high=1.0, shape=(self.number_of_parameters * 2 + 4,), dtype=np.float32
         )
 
         # for the action space we use single incremental steps,
@@ -21,18 +21,19 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
         self.action_space = gym.spaces.Discrete(self.number_of_parameters * 2)
 
     def _get_obs(self):
-        # creates a normalized nparray that represents the observation
         normalized_list = []
-
-        # add current config and best seen config
+        # Current config
         normalized_list.extend(self._normalize_config(self.current_config))
-
-        # add the execution times
-        current_exec_time = self.current_exec_time
-        normalized_list.append(self._normalize_exec_time(current_exec_time))
-
-        # add the point in time, based on the step_count
+        # Best-seen config
+        normalized_list.extend(self._normalize_config(self.best_seen_config))
+        # Current exec time
+        normalized_list.append(self._normalize_exec_time(self.current_exec_time))
+        # Best-seen exec time
+        normalized_list.append(self._normalize_exec_time(self.best_seen_exec_time))
+        # Step progress
         normalized_list.append(min(self.step_count / self.max_steps, 1.0))
+        # Steps since improvement
+        normalized_list.append(min(self.steps_since_improvement / self.max_steps, 1.0))
 
         return np.array(normalized_list, dtype=np.float32)
 
@@ -100,13 +101,14 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
 
         truncated = True if self.step_count >= self.max_steps else False
 
-        # get reward, based on current and new exec_time
-
         self.current_exec_time = self.backend.get_exec_time(self.current_config)
         if self.current_exec_time < self.best_seen_exec_time:
             self.best_seen_exec_time = self.current_exec_time
-
             self.best_seen_config = self.current_config.copy()
+            self.steps_since_improvement = 0
+        else:
+            self.steps_since_improvement += 1
+
 
         if self.backend.has_precomputed_stats:
             terminated = self.current_exec_time == self.optimum_exec_time

@@ -14,7 +14,7 @@ class KernelTunerRLEnvGoal(KernelTunerRLEnvBase):
 
         inner_obs_space = gym.spaces.Box(
             low=0.0, high=1.0,
-            shape=(self.number_of_parameters + 2,),
+            shape=(self.number_of_parameters * 2 + 4,),
             dtype=np.float32,
         )
 
@@ -48,9 +48,11 @@ class KernelTunerRLEnvGoal(KernelTunerRLEnvBase):
     def _get_inner_obs(self):
         normalized_list = []
         normalized_list.extend(self._normalize_config(self.current_config))
+        normalized_list.extend(self._normalize_config(self.best_seen_config))
         normalized_list.append(self._normalize_exec_time(self.current_exec_time))
+        normalized_list.append(self._normalize_exec_time(self.best_seen_exec_time))
         normalized_list.append(min(self.step_count / self.max_steps, 1.0))
-
+        normalized_list.append(min(self.steps_since_improvement / self.max_steps, 1.0))
         return np.array(normalized_list, dtype=np.float32)
 
     def _get_obs(self):
@@ -100,6 +102,9 @@ class KernelTunerRLEnvGoal(KernelTunerRLEnvBase):
         if self.current_exec_time < self.best_seen_exec_time:
             self.best_seen_exec_time = self.current_exec_time
             self.best_seen_config = self.current_config.copy()
+            self.steps_since_improvement = 0
+        else:
+            self.steps_since_improvement += 1
 
         observation = self._get_obs()
         achieved = observation["achieved_goal"]

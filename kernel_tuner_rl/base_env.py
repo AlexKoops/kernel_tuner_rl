@@ -40,6 +40,8 @@ class KernelTunerRLEnvBase(gym.Env):
 
         self.episode_start_exec_time = None
 
+        self.steps_since_improvement = None
+
         
     def _get_info(self):
         # Generate extra info for debugging purposes
@@ -84,6 +86,8 @@ class KernelTunerRLEnvBase(gym.Env):
 
         self.best_seen_exec_time = self.current_exec_time
         self.best_seen_config = self.current_config.copy()
+
+        self.steps_since_improvement = 0
 
         self.episode_start_exec_time = self.current_exec_time
 
