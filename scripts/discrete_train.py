@@ -17,11 +17,10 @@ from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 
-from kernel_tuner_rl.env import KernelTunerRLEnv
 from kernel_tuner_rl.discrete_env import KernelTunerRLEnvDiscrete
 from kernel_tuner_rl.cache_picker import choose_cache_file
 from kernel_tuner_rl.backends import CacheBackend
-from kernel_tuner_rl.utils import get_kernel_name
+from kernel_tuner_rl.utils import get_kernel_name, random_baseline
 
 
 def mask_fn(env: gym.Env) -> np.ndarray:
@@ -82,12 +81,35 @@ class CallBack(BaseCallback):
         with open(self.save_path, 'w', newline='') as save_file:
             writer = csv.writer(save_file)
             writer.writerow([
-                "timestep", "gpu", "is_holdout", "episode", "gap", "best_exec_time",
+                "timestep", "gpu", "is_holdout", "is_baseline", "episode", "gap", "best_exec_time",
                 "entropy", "policy_loss", "value_loss", "clip_fraction", "mean_ep_return"
             ])
+        self.baselines = {}
+        for f in list(train_files) + list(holdout_files):
+            backend = CacheBackend(str(f))
+            env = KernelTunerRLEnvDiscrete(backend)
+            self.baselines[f.name] = random_baseline(
+                backend, n_samples=env.max_steps, n_trials=5, seed=0
+            )
+
+        # Write baseline rows to CSV (timestep=0, episode=-1, is_baseline=True).
+        with open(self.save_path, 'a', newline='') as save_file:
+            writer = csv.writer(save_file)
+            holdout_names = {f.name for f in holdout_files}
+            for f in list(train_files) + list(holdout_files):
+                b = self.baselines[f.name]
+                writer.writerow([
+                    0, f.name.split('.')[0], f.name in holdout_names, True,
+                    -1, b["mean_gap"], None,
+                    None, None, None, None, None,
+                ])
+
+        self._holdout_names = {f.name for f in holdout_files}
+
 
     def _on_step(self) -> bool:
         if self.num_timesteps % self.eval_freq == 0:
+            print(f"\n=== Eval @ timestep {self.num_timesteps} ===")
 
             log = self.model.logger.name_to_value
             entropy = log.get("train/entropy_loss", None)
@@ -115,10 +137,11 @@ class CallBack(BaseCallback):
                     median_exec_time = np.median(all_times)
                     scale = median_exec_time - actual_best
 
+                    episode_gaps = []
+
                     for ep in range(N_EPISODES):
-                        seed = self.num_timesteps * 1000 + ep
-                        obs, info = env.reset(seed=seed)
-                        np.random.seed(ep)
+                        ep_seed = self.num_timesteps * 1000 + ep
+                        obs, info = env.reset(seed=ep_seed)
                         truncated = False
                         terminated = False
                         while not truncated and not terminated:
@@ -127,12 +150,23 @@ class CallBack(BaseCallback):
 
                         ep_best = env.env.best_seen_exec_time
                         gap = (ep_best - actual_best) / scale * 100
+                        episode_gaps.append(gap)
 
                         writer.writerow([
-                            self.num_timesteps, f.name.split('.')[0], is_holdout, ep, gap, ep_best,
+                            self.num_timesteps, f.name.split('.')[0], is_holdout, False, ep, gap, ep_best,
                             entropy, policy_loss, value_loss, clip_fraction, mean_ep_return
                         ])
 
+                    mean_gap = float(np.mean(episode_gaps))
+                    best_gap = float(np.min(episode_gaps))
+                    baseline_mean = self.baselines[f.name]["mean_gap"]
+                    tag = "HOLDOUT" if is_holdout else "TRAIN  "
+                    marker = "✓" if mean_gap < baseline_mean else "✗"
+                    print(
+                        f"  [{tag}] {f.name.split('.')[0]:<25} "
+                        f"mean={mean_gap:6.2f}% best={best_gap:6.2f}% "
+                        f"| random mean={baseline_mean:6.2f}% {marker}"
+                    )
         return True
 
 
@@ -166,10 +200,10 @@ if __name__ == "__main__":
     results_dir = f"results/{kernel_name}/seed_{seed}/"
     os.makedirs(results_dir, exist_ok=True)
 
-    model = MaskablePPO(MaskableActorCriticPolicy, env, seed=seed, verbose=1, gamma=0.999, clip_range=0.2, ent_coef=0.01)
-    myCallback = CallBack(25_000, cache_files, holdout_files, results_dir + "eval_results.csv")
+    model = MaskablePPO(MaskableActorCriticPolicy, env, seed=seed, verbose=0, gamma=0.999, clip_range=0.2, ent_coef=0.01)
+    myCallback = CallBack(5_000, cache_files, holdout_files, results_dir + "eval_results.csv")
     try:
-        model.learn(total_timesteps=total_timesteps)
+        model.learn(total_timesteps=total_timesteps, callback=myCallback)
     except Exception as e:
         print(f"learn() failed: {e}")
         raise

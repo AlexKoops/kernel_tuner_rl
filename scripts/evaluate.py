@@ -48,6 +48,7 @@ if __name__ == "__main__":
     for cache_file in cache_files:
         backend = CacheBackend(str(cache_file))
         env = KernelTunerRLEnvDiscrete(backend)
+
         env = ActionMasker(env, mask_fn)
 
         all_times = sorted(
@@ -66,8 +67,9 @@ if __name__ == "__main__":
         overall_best_config = None
 
         for ep in range(N_EPISODES):
-            obs, info = env.reset(seed=ep)
-            np.random.seed(ep)
+            ep_seed = time.time() * 1000 + ep
+
+            obs, info = env.reset(seed=ep_seed)
             truncated = False
             terminated = False
             while not truncated and not terminated:

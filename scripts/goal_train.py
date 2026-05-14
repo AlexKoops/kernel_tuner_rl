@@ -96,7 +96,7 @@ class EvalCallback(BaseCallback):
                 [(p, False) for p in self.train_files]
                 + [(p, True) for p in self.holdout_files]
             )
-            N_EPISODES = 1
+            N_EPISODES = 5
             for path, is_holdout in all_files:
                 backend = CacheBackend(str(path))
                 env = KernelTunerRLEnvGoal(backend, self.desired_speedup)
@@ -110,7 +110,8 @@ class EvalCallback(BaseCallback):
                 scale = median_exec_time - actual_best
  
                 for ep in range(N_EPISODES):
-                    obs, info = env.reset(seed=ep)
+                    ep_seed = self.num_timesteps * 1000 + ep
+                    obs, info = env.reset(seed=ep_seed)
                     terminated = False
                     truncated = False
                     while not (terminated or truncated):

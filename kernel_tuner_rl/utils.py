@@ -1,5 +1,6 @@
 import json
 import gzip
+import numpy as np
 from pathlib import Path
 
 
@@ -50,3 +51,27 @@ def get_kernel_name(paths):
             raise ValueError("Cache files contain different kernels")
         
     return parent_name
+
+
+def random_baseline(backend, n_samples, n_trials=5, seed=0):
+    """Best-of-n_samples random valid configs, averaged over n_trials.
+    Returns dict with mean_gap, best_gap, std_gap."""
+    rng = np.random.default_rng(seed)
+    configs = backend.searchspace
+    all_times = sorted(
+        t for t in (backend.get_exec_time(c) for c in configs)
+        if t != float("inf")
+    )
+    actual_best = all_times[0]
+    scale = np.median(all_times) - actual_best
+
+    gaps = []
+    for trial in range(n_trials):
+        idx = rng.choice(len(configs), size=min(n_samples, len(configs)), replace=False)
+        times = [backend.get_exec_time(configs[i]) for i in idx]
+        times = [t for t in times if t != float("inf")]
+        best = min(times) if times else float("inf")
+        gaps.append((best - actual_best) / scale * 100)
+
+    gaps = np.array(gaps)
+    return {"mean_gap": float(gaps.mean()), "best_gap": float(gaps.min()), "std_gap": float(gaps.std())}
