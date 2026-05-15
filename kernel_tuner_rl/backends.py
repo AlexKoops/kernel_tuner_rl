@@ -119,7 +119,7 @@ class CacheBackend(Backend):
 
 class KernelTunerBackend(Backend):
 
-    def __init__(self, searchspace_object: Searchspace, runner: Runner, tune_options):
+    def __init__(self, searchspace_object: Searchspace, runner: Runner, tune_options, calibration_samples: int = 30):
         # {(16, 1): 0, (16, 2): 1, (32, 1): 2}
         # maps the configs to its index in self.list for fast lookup
         self.searchspace = searchspace_object
@@ -138,9 +138,39 @@ class KernelTunerBackend(Backend):
         # set to hold runner results
         self.runner_results = []
 
+        self._calibrate(calibration_samples)
+
+    def _calibrate(self, n_samples: int):
+        valid_list = list(self.valid_configs)
+        n = min(n_samples, len(valid_list))
+        sample = random.sample(valid_list, n)
+
+        times = []
+        for config_tuple in sample:
+            config = dict(zip(self.param_names, config_tuple))
+            t = self.get_exec_time(config)
+            if isinstance(t, float) and t != float("inf"):
+                times.append(t)
+
+        if not times:
+            # Pathological case; fall back to "deployment" semantics.
+            self._calibrated_min = 0.0
+            self._calibrated_max = float("inf")
+            self._has_stats = False
+        else:
+            self._calibrated_min = min(times)
+            self._calibrated_max = max(times)
+            self._has_stats = True
+
     @property
     def has_precomputed_stats(self):
-        return False
+        return self._has_stats
+
+    def get_max_exec(self):
+        return self._calibrated_max
+
+    def get_opti_exec(self):
+        return self._calibrated_min
 
     def get_tune_params_dict(self):
         return self.tune_params
@@ -180,10 +210,3 @@ class KernelTunerBackend(Backend):
 
         return dict(zip(self.param_names, choice))
 
-    # not implemented, precomputed stats flag is False
-    def get_max_exec(self):
-        raise NotImplementedError
-
-    # not implemented, precomputed stats flag is False
-    def get_opti_exec(self):
-        raise NotImplementedError

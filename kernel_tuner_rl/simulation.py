@@ -129,10 +129,12 @@ def tune(
     end = time.time()
     env["execution_time"] = end - start
 
-    store_output_file(f"{base_cachepath}-results.json", results, tune_params)
-    store_metadata_file(f"{base_cachepath}-metadata.json")
+    # store_output_file(f"{base_cachepath}-results.json", results, tune_params)
+    # store_metadata_file(f"{base_cachepath}-metadata.json")
     return results, env
 
 
 if __name__ == "__main__":
+    tune(device_name="A100")
     tune(device_name="A4000")
+    tune(device_name="A6000")
