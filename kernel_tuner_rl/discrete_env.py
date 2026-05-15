@@ -126,4 +126,3 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
         # return observation, reward, terminated, truncated and info
 
         return observation, reward, terminated, truncated, info
-

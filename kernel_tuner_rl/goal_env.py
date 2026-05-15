@@ -117,4 +117,3 @@ class KernelTunerRLEnvGoal(KernelTunerRLEnvBase):
         reward = float(reward_arr.item())
 
         return observation, reward, terminated, truncated, info
-

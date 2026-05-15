@@ -22,7 +22,7 @@ class KernelTunerRLEnvBase(gym.Env):
         self.param_keys = list(self.tune_params.keys())
         self.number_of_parameters = len(self.param_keys)
 
-        self.max_steps = int(min(1000, backend.get_searchspace_size() * searchspace_percentage))
+        self.max_steps = int(min(3000, backend.get_searchspace_size() * searchspace_percentage))
 
         if backend.has_precomputed_stats:
             # highest config execution time, will be used for the normalization
@@ -117,4 +117,3 @@ class KernelTunerRLEnvBase(gym.Env):
     @abstractmethod
     def step(self, action):
         pass
-
