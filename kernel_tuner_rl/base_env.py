@@ -1,7 +1,6 @@
 import gymnasium as gym
 from typing import Optional
 import numpy as np
-import random
 from abc import abstractmethod
 
 class KernelTunerRLEnvBase(gym.Env):
@@ -76,10 +75,7 @@ class KernelTunerRLEnvBase(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
-        if seed is not None:
-            random.seed(seed)
-
-        self.current_config = self.backend.get_random_start(seed)
+        self.current_config = self.backend.get_random_start(self.np_random)
         self.step_count = 0
         self.current_exec_time = self.backend.get_exec_time(self.current_config)
         self.prev_exec_time = self.current_exec_time

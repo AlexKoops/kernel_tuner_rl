@@ -18,7 +18,7 @@ def tune(searchspace: Searchspace, runner, tuning_options):
     backend = KernelTunerBackend(searchspace, runner, tuning_options)
     env = KernelTunerRLEnvDiscrete(backend)
     env = ActionMasker(env, mask_fn)
-    model = MaskablePPO.load("models/ppo_convolution_milo")
+    model = MaskablePPO.load("models/convolution_milo/ppo_seed0")
 
     # Run multiple episodes and return the best, matching eval semantics.
     best_results = []

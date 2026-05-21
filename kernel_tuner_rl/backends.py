@@ -104,11 +104,9 @@ class CacheBackend(Backend):
 
     # output: dict of parameter options and their configs
     # example: {"block_size": 16, "tile_size": 1}
-    def get_random_start(self, seed: Optional[int] = None):
-        if seed is not None:
-            random.seed(seed)
-
-        return random.choice(self.searchspace)
+    def get_random_start(self, rng):
+        index = rng.integers(0, len(self.searchspace))
+        return self.searchspace[index]
 
     def get_max_exec(self):
         return float(max(t for t in (self.get_exec_time(c) for c in self.searchspace)))
@@ -153,7 +151,6 @@ class KernelTunerBackend(Backend):
                 times.append(t)
 
         if not times:
-            # Pathological case; fall back to "deployment" semantics.
             self._calibrated_min = 0.0
             self._calibrated_max = float("inf")
             self._has_stats = False
@@ -202,11 +199,9 @@ class KernelTunerBackend(Backend):
 
     # output: dict of parameter options and their configs
     # example: {"block_size": 16, "tile_size": 1}
-    def get_random_start(self, seed: Optional[int] = None):
-        if seed is not None:
-            random.seed(seed)
-
-        choice = random.choice(list(self.valid_configs))
-
+    def get_random_start(self, rng):
+        valid_list = list(self.valid_configs)
+        index = rng.integers(0, len(valid_list))
+        choice = valid_list[index]
         return dict(zip(self.param_names, choice))
 
