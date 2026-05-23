@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+import numpy as np
 import random
 
 from kernel_tuner.searchspace import Searchspace
@@ -74,6 +75,7 @@ class CacheBackend(Backend):
         #     "16,2"
         # }
         self.valid_configs = {config_to_string(c) for c in self.searchspace}
+        self.all_times = list(t for t in (self.get_exec_time(c) for c in self.searchspace))
 
     @property
     def has_precomputed_stats(self):
@@ -109,10 +111,13 @@ class CacheBackend(Backend):
         return self.searchspace[index]
 
     def get_max_exec(self):
-        return float(max(t for t in (self.get_exec_time(c) for c in self.searchspace)))
+        return float(max(self.all_times))
 
     def get_opti_exec(self):
-        return float(min(t for t in (self.get_exec_time(c) for c in self.searchspace)))
+        return float(min(self.all_times))
+
+    def get_median_exec(self):
+        return float(np.median(self.all_times))
 
 
 class KernelTunerBackend(Backend):
@@ -157,6 +162,7 @@ class KernelTunerBackend(Backend):
         else:
             self._calibrated_min = min(times)
             self._calibrated_max = max(times)
+            self._calibrated_median = np.median(times)
             self._has_stats = True
 
     @property
@@ -168,6 +174,9 @@ class KernelTunerBackend(Backend):
 
     def get_opti_exec(self):
         return self._calibrated_min
+
+    def get_median_exec(self):
+        return self._calibrated_median
 
     def get_tune_params_dict(self):
         return self.tune_params

@@ -4,10 +4,11 @@ import numpy as np
 from abc import abstractmethod
 
 class KernelTunerRLEnvBase(gym.Env):
-    def __init__(self, backend):
+    def __init__(self, backend, gpu_features=None):
         super().__init__()
 
         self.backend = backend
+        self.gpu_features = list(gpu_features) if gpu_features is not None else []
 
         self.current_config = None
         self.step_count = None
@@ -15,13 +16,13 @@ class KernelTunerRLEnvBase(gym.Env):
         self.prev_exec_time = None
         self.gamma = 0.999
 
-        searchspace_percentage = 0.1
+        searchspace_percentage = 0.05
 
         self.tune_params = backend.get_tune_params_dict()
         self.param_keys = list(self.tune_params.keys())
         self.number_of_parameters = len(self.param_keys)
 
-        self.max_steps = int(min(3000, backend.get_searchspace_size() * searchspace_percentage))
+        self.max_steps = int(min(1000, backend.get_searchspace_size() * searchspace_percentage))
 
         if backend.has_precomputed_stats:
             # highest config execution time, will be used for the normalization
@@ -40,8 +41,8 @@ class KernelTunerRLEnvBase(gym.Env):
         self.episode_start_exec_time = None
 
         self.steps_since_improvement = None
-
         
+
     def _get_info(self):
         # Generate extra info for debugging purposes
         return {"best_seen_exec_time": self.best_seen_exec_time}
@@ -75,10 +76,13 @@ class KernelTunerRLEnvBase(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
+
         self.current_config = self.backend.get_random_start(self.np_random)
+
         self.step_count = 0
         self.current_exec_time = self.backend.get_exec_time(self.current_config)
         self.prev_exec_time = self.current_exec_time
+
 
         self.best_seen_exec_time = self.current_exec_time
         self.best_seen_config = self.current_config.copy()
@@ -95,6 +99,8 @@ class KernelTunerRLEnvBase(gym.Env):
             # add Potential-Based shaping to the reward
             phi_current = self.optimum_exec_time / self.current_exec_time
             phi_prev = self.optimum_exec_time / self.prev_exec_time
+            
+            # gives a reward, based on distance between current config and optimum
             shaping = self.gamma * phi_current - phi_prev
 
             reward = R_true + shaping

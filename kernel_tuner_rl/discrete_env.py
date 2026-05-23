@@ -3,16 +3,17 @@ import numpy as np
 from kernel_tuner_rl.base_env import KernelTunerRLEnvBase
 
 class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
-    def __init__(self, backend):
-        super().__init__(backend)
+    def __init__(self, backend, gpu_features=None):
+        super().__init__(backend, gpu_features=gpu_features)
 
+        n_gpu = len(self.gpu_features)
         # The observation or state space for this environment is defined as follows:
         #   * current kernel configuration
         #   * current kernel configuration exec time
         #   * step progress = step_count/max_steps
         #   * the high is set to 1.0 since the parameter values and exec time will be normalized
         self.observation_space = gym.spaces.Box(
-            low=0, high=1.0, shape=(self.number_of_parameters * 2 + 4,), dtype=np.float32
+            low=0, high=1.0, shape=(self.number_of_parameters * 2 + 4 + n_gpu,), dtype=np.float32
         )
 
         # for the action space we use single incremental steps,
@@ -34,6 +35,8 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
         normalized_list.append(min(self.step_count / self.max_steps, 1.0))
         # Steps since improvement
         normalized_list.append(min(self.steps_since_improvement / self.max_steps, 1.0))
+
+        normalized_list.extend(self.gpu_features)
 
         return np.array(normalized_list, dtype=np.float32)
 
@@ -66,7 +69,7 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
         return self._get_obs(), self._get_info()
 
     def step(self, action):
-        # move agent to next config, follpwing the correct direction
+        # move agent to next config, following the correct direction
 
         param_index = action // 2  # the parameter where the step will occur
         direction = action % 2  # the direction the parameter value will step to
@@ -80,15 +83,8 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
         tune_param_index = tune_params[key_to_update].index(new_config[key_to_update])
         self.prev_exec_time = self.current_exec_time
 
-        # first 2 if elif statements are only added for check_env() to be able to pass, since this does not support action maskign
-        # if direction == 0 and tune_param_index == 0:
-        #     # can't step down, stay in place
-        #     new_config = self.current_config.copy()
-        # elif direction == 1 and tune_param_index == len(tune_params[key_to_update]) - 1:
-        #     # can't step up, stay in place
-        #     new_config = self.current_config.copy()
-
-        # these 2 are the only ifs that should trigger when action masking class is used
+        # create new config based on the parameter value the agent decided to change
+        # NOTE: to make the check_env() function pass, config validation checks should be added, since check_env does not use achtion masking
         if direction == 0:
             new_config[key_to_update] = tune_params[key_to_update][tune_param_index - 1]
         else:
@@ -99,7 +95,7 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
 
         self.step_count += 1
 
-        truncated = True if self.step_count >= self.max_steps else False
+        truncated = self.step_count >= self.max_steps
 
         self.current_exec_time = self.backend.get_exec_time(self.current_config)
         if self.current_exec_time < self.best_seen_exec_time:
@@ -108,7 +104,6 @@ class KernelTunerRLEnvDiscrete(KernelTunerRLEnvBase):
             self.steps_since_improvement = 0
         else:
             self.steps_since_improvement += 1
-
 
         if self.backend.has_precomputed_stats:
             terminated = self.current_exec_time == self.optimum_exec_time
