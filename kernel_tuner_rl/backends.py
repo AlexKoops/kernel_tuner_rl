@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 import numpy as np
-import random
-
 from kernel_tuner.searchspace import Searchspace
 from kernel_tuner.runners.runner import Runner
+from kernel_tuner.strategies.common import CostFunc
+from kernel_tuner.util import StopCriterionReached
+
 
 from kernel_tuner_rl.utils import cache_to_searchSpaceInfo, config_to_string
 
@@ -33,7 +33,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def get_random_start(self):
+    def get_random_start(self, rng):
         pass
 
     @abstractmethod
@@ -43,6 +43,10 @@ class Backend(ABC):
     @abstractmethod
     def get_opti_exec(self):
         pass
+
+    def get_max_steps(self):
+        searchspace_percentage = 0.05
+        return int(min(1000, self.get_searchspace_size() * searchspace_percentage))
 
 
 class CacheBackend(Backend):
@@ -136,33 +140,37 @@ class KernelTunerBackend(Backend):
         # set of config tuples
         self.valid_configs = set(searchspace_object.list)
 
-        self.runner = runner
         self.tune_options = tune_options
-        # set to hold runner results
-        self.runner_results = []
+        
+        self.cost_func = CostFunc(searchspace_object, tune_options, runner)
 
-        self._calibrate(calibration_samples)
+        self._calibrate(min(calibration_samples, 5))
 
-    def _calibrate(self, n_samples: int):
+    def _calibrate(self, n_samples):
         valid_list = list(self.valid_configs)
+        rng = np.random.default_rng()
         n = min(n_samples, len(valid_list))
-        sample = random.sample(valid_list, n)
+        idxs = rng.choice(len(valid_list), size=n, replace=False)
+        sample = [valid_list[i] for i in idxs]
 
         times = []
-        for config_tuple in sample:
-            config = dict(zip(self.param_names, config_tuple))
-            t = self.get_exec_time(config)
-            if isinstance(t, float) and t != float("inf"):
-                times.append(t)
+        try:
+            for config_tuple in sample:
+                t = self.cost_func(config_tuple, check_restrictions=False)
+                if isinstance(t, float) and t != float("inf"):
+                    times.append(t)
+        except StopCriterionReached:
+            pass  # budget ran out during calibration
 
-        if not times:
+        if len(times) < 2:
             self._calibrated_min = 0.0
             self._calibrated_max = float("inf")
+            self._calibrated_median = float("inf")
             self._has_stats = False
         else:
-            self._calibrated_min = min(times)
-            self._calibrated_max = max(times)
-            self._calibrated_median = np.median(times)
+            self._calibrated_min = float(min(times))
+            self._calibrated_max = float(max(times))
+            self._calibrated_median = float(np.median(times))
             self._has_stats = True
 
     @property
@@ -188,16 +196,9 @@ class KernelTunerBackend(Backend):
     #
     # output: exec time as a float
     def get_exec_time(self, config):
-        config_tuple = tuple(list(config.values()))
-
-        result = self.runner.run([config_tuple], self.tune_options)
-
-        exec_time = result[0][self.tune_options.objective]
-        if not isinstance(exec_time, float):
-            return float("inf")
-
-        self.runner_results.append(result[0])
-        return exec_time
+        config_tuple = tuple(config[k] for k in self.param_names)
+        t = self.cost_func(config_tuple, check_restrictions=False)
+        return t if isinstance(t, float) else float("inf")
 
     # config: dict of tune parameter configurations
     #
