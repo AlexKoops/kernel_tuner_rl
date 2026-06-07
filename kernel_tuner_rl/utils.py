@@ -1,7 +1,6 @@
 import json
 import gzip
 import numpy as np
-from pathlib import Path
 
 
 def load_json(file):
@@ -55,13 +54,7 @@ def get_kernel_name(paths):
 
 def random_baseline(backend, n_samples, n_trials=5, seed=0,
                     actual_best=None, scale=None):
-    """Best-of-n_samples random valid configs, averaged over n_trials.
-    Returns dict with mean_gap, best_gap, std_gap.
-
-    If actual_best and scale are not provided, they are computed by scanning
-    the search space (expensive on large kernels). Pass them in if you've
-    already computed them.
-    """
+    "collect random baseline metrics to compare against agent runs"
     rng = np.random.default_rng(seed)
     configs = backend.searchspace
 

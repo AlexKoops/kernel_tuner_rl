@@ -150,13 +150,13 @@ class KernelTunerBackend(Backend):
         valid_list = list(self.valid_configs)
         rng = np.random.default_rng()
         n = min(n_samples, len(valid_list))
-        idxs = rng.choice(len(valid_list), size=n, replace=False)
-        sample = [valid_list[i] for i in idxs]
+        choices = rng.choice(len(valid_list), size=n, replace=False)
+        sample = [valid_list[c] for c in choices]
 
         times = []
         try:
-            for config_tuple in sample:
-                t = self.cost_func(config_tuple, check_restrictions=False)
+            for config in sample:
+                t = self.cost_func(config, check_restrictions=False)
                 if isinstance(t, float) and t != float("inf"):
                     times.append(t)
         except StopCriterionReached:

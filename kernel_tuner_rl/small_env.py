@@ -7,10 +7,11 @@ class KernelTunerRLEnvSmall(KernelTunerRLEnvBase):
         super().__init__(backend)
 
         # The observation or state space for this environment is defined as follows:
-        #   * current kernel configuration
-        #   * current kernel configuration exec time
-        #   * step progress = step_count/max_steps
-        #   * the high is set to 1.0 since the parameter values and exec time will be normalized
+        # - current kernel configuration
+        # - current kernel configuration exec time
+        # - best seen exec time
+        # - step progress = step_count/max_steps
+        # - the high is set to 1.0 since the parameter values and exec time will be normalized
         self.observation_space = gym.spaces.Box(
             low=0, high=1.0, shape=(self.number_of_parameters + 3,), dtype=np.float32
         )
@@ -26,6 +27,7 @@ class KernelTunerRLEnvSmall(KernelTunerRLEnvBase):
         normalized_list.extend(self._normalize_config(self.current_config))
         # Current exec time
         normalized_list.append(self._normalize_exec_time(self.current_exec_time))
+        # Best seen exec time
         normalized_list.append(self._normalize_exec_time(self.best_seen_exec_time))
         # Step progress
         normalized_list.append(min(self.step_count / self.max_steps, 1.0))
@@ -67,7 +69,6 @@ class KernelTunerRLEnvSmall(KernelTunerRLEnvBase):
         direction = action % 2  # the direction the parameter value will step to
 
         key_to_update = self.param_keys[param_index]
-
         new_config = self.current_config.copy()
 
         # get the index for the current parameter setting

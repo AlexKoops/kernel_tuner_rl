@@ -51,6 +51,7 @@ class KernelTunerRLEnvBase(gym.Env):
                 normalized.append(index / (tune_param_length - 1))
         return normalized
 
+    # min-max normalization on the exec time
     def _normalize_exec_time(self, exec_time):
         if exec_time == float("inf"):
             return 1.0
@@ -62,15 +63,15 @@ class KernelTunerRLEnvBase(gym.Env):
                 (exec_time - self.optimum_exec_time) / diff,
                 0.0, 1.0,
             ))
-        # Deployment fallback (no precomputed stats): keep the old behavior
+        # fallback when no precomputed statistics exist
         return float(self.episode_start_exec_time / (self.episode_start_exec_time + exec_time))
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
-        self.current_config = self.backend.get_random_start(self.np_random)
+        self.current_config = self.backend.get_random_start(self.np_random) # place agent on a random config
         self.step_count = 0
-        self.current_exec_time = self.backend.get_exec_time(self.current_config)
+        self.current_exec_time = self.backend.get_exec_time(self.current_config) # get first config exec time
         self.prev_exec_time = self.current_exec_time
         self.best_seen_exec_time = self.current_exec_time
         self.best_seen_config = self.current_config.copy()
