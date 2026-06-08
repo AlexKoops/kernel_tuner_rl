@@ -5,8 +5,8 @@ Trains a MaskablePPO agent on one or more GPU kernel cache files simultaneously.
 The trained model is saved to models/<kernel_name>/<agent>_<tag>_ppo_seed<seed>.
 
 Usage examples:
-    python train.py --agent hamming --train cache_files/*.json --seed 0 --total-timesteps 600000
-    python train.py --agent perparameter --train cache_files/*.json --seed 0 --total-timesteps 2000000
+    python scripts/train.py --agent hamming --train cache_files/<kernel_name>/*.json --seed 0 --total-timesteps 600000 --tag example
+    python scripts/train.py --agent perparameter --train cache_files/<kernel_name>/*.json --seed 0 --total-timesteps 2000000 --tag example
 """
 import os
 import sys
@@ -29,10 +29,15 @@ from kernel_tuner_rl.utils import get_kernel_name
 
 def mask_fn(env: gym.Env) -> np.ndarray:
     """
-        Extracts the action mask from the unwrapped environment to use with MaskablePPO
+    Extracts the action mask from the unwrapped environment to use with MaskablePPO
+
+    Parameters:
+        - env: the gymnasium environment from which the action_masks() function will be used
+
+    Return:
+        the np.ndarray filled with booleans, created by the action_masks() from env
     """
     return env.unwrapped.action_masks()
-
 
 def parse_args():
     """
