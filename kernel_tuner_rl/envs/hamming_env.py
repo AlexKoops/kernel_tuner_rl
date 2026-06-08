@@ -2,7 +2,7 @@ import gymnasium as gym
 import numpy as np
 from kernel_tuner_rl.envs import KernelTunerRLEnvBase
 
-class KernelTunerRLEnvSmall(KernelTunerRLEnvBase):
+class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
     def __init__(self, backend):
         super().__init__(backend)
 

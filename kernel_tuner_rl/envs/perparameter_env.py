@@ -3,7 +3,10 @@ import numpy as np
 from kernel_tuner_rl.envs import KernelTunerRLEnvBase
 
 
-class KernelTunerRLEnvBig(KernelTunerRLEnvBase):
+class KernelTunerRLEnvPerparameter(KernelTunerRLEnvBase):
+    """
+    Environment for the perparameter agent
+    """
     def __init__(self, backend):
         super().__init__(backend)
 
