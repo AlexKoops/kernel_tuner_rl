@@ -1,0 +1,11 @@
+# Python >= 3.9 required
+numpy
+gymnasium
+sb3-contrib
+stable-baselines3
+matplotlib
+questionary
+kernel-tuner>=1.1.3
+autotuning-methodology>=1.0.0
+rich>=15.0.0
+tqdm>=4.67.3
