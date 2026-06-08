@@ -5,7 +5,7 @@ from kernel_tuner_rl.envs import KernelTunerRLEnvBase
 
 class KernelTunerRLEnvPerparameter(KernelTunerRLEnvBase):
     """
-    Environment for the perparameter agent
+    Environment to train PPO-based agents with a Perparameter action space
     """
     def __init__(self, backend):
         super().__init__(backend)
@@ -31,15 +31,32 @@ class KernelTunerRLEnvPerparameter(KernelTunerRLEnvBase):
                 self._action_lookup.append((key, value_idx))
 
     def _get_obs(self):
+        """
+        Create a list of normalized config, execution times and step progress
+
+        Return:
+            - array of normalized observations
+        """
         normalized_list = []
+        # Current config
         normalized_list.extend(self._normalize_config(self.current_config))
+        # Current exec time
         normalized_list.append(self._normalize_exec_time(self.current_exec_time))
+        # Best seen exec time
         normalized_list.append(self._normalize_exec_time(self.best_seen_exec_time))
+        # Step progress
         normalized_list.append(min(self.step_count / self.max_steps, 1.0))
+
         return np.array(normalized_list, dtype=np.float32)
 
 
     def action_masks(self) -> np.ndarray:
+        """
+        Create a boolean array for each action stating if it is valid or not
+
+        Return:
+            - boolean array showing valid and invalid actions as True and False respectively
+        """
         mask = np.zeros(self.total_options, dtype=np.bool_)
         for action_idx, (key, value_idx) in enumerate(self._action_lookup):
             current_v_idx = self.tune_params[key].index(self.current_config[key])
@@ -57,6 +74,20 @@ class KernelTunerRLEnvPerparameter(KernelTunerRLEnvBase):
         return self._get_obs(), self._get_info()
 
     def step(self, action):
+        """
+        Move agent to next config, following the correct direction
+
+        Parameters:
+            - action: the chosen action to take by the agent
+
+        Return:
+            - observation: the new observation the agent sees after taking action
+            - reward: the reward this action resulted in 
+            - terminated: boolean if the agent used all its episode budget
+            - truncated: boolean if the agent has found the optimal solution 
+            - info: additional debug info
+        """
+
         # Determine the values to change, based on the chosen action
         key_to_update, value_idx = self._action_lookup[action]
         new_value = self.tune_params[key_to_update][value_idx]

@@ -1,3 +1,3 @@
 from kernel_tuner_rl.envs.base_env import KernelTunerRLEnvBase
-from kernel_tuner_rl.envs.small_env import KernelTunerRLEnvSmall
-from kernel_tuner_rl.envs.big_env import KernelTunerRLEnvBig
+from kernel_tuner_rl.envs.small_env import KernelTunerRLEnvHamming
+from kernel_tuner_rl.envs.big_env import KernelTunerRLEnvPerparameter

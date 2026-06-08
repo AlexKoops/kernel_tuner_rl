@@ -4,6 +4,9 @@ import numpy as np
 from abc import abstractmethod
 
 class KernelTunerRLEnvBase(gym.Env):
+    """
+    Shared base class for both environments, defines shared logic in the environments
+    """
     def __init__(self, backend):
         super().__init__()
 
@@ -22,6 +25,7 @@ class KernelTunerRLEnvBase(gym.Env):
 
         self.max_steps = backend.get_max_steps() # max episode length, clipped at 1000
 
+        # if precomputed stats exist, use these
         if backend.has_precomputed_stats:
             self.max_exec_time = backend.get_max_exec() # used for normalization
             self.optimum_exec_time = backend.get_opti_exec() # used for reward calculation
@@ -40,6 +44,15 @@ class KernelTunerRLEnvBase(gym.Env):
         return {"best_seen_exec_time": self.best_seen_exec_time}
 
     def _normalize_config(self, config):
+        """
+        Normalizes the configuration based on the amount of options per parameter.
+
+        Parameters:
+            config: the config to normalize
+
+        Return:
+            list of normalized parameter values for the given config
+        """
         normalized = []
         tune_params = self.tune_params
         for key in config:
@@ -53,6 +66,15 @@ class KernelTunerRLEnvBase(gym.Env):
 
     # min-max normalization on the exec time
     def _normalize_exec_time(self, exec_time):
+        """
+        Min-Max normalization on the execution time
+
+        Parameters:
+            - exec_time: the execution time to normalize
+
+        Return:
+            - normalized execution time as a float
+        """
         if exec_time == float("inf"):
             return 1.0
         if self.backend.has_precomputed_stats:
@@ -67,6 +89,9 @@ class KernelTunerRLEnvBase(gym.Env):
         return float(self.episode_start_exec_time / (self.episode_start_exec_time + exec_time))
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
+        """
+        Reset function for the environment. Places agent on new random configuration and resets class attributes
+        """
         super().reset(seed=seed)
 
         self.current_config = self.backend.get_random_start(self.np_random) # place agent on a random config
@@ -78,6 +103,15 @@ class KernelTunerRLEnvBase(gym.Env):
         self.episode_start_exec_time = self.current_exec_time
 
     def _compute_reward(self, terminated):
+        """
+        Function to determine the reward after each agent action in a state. Uses Potential-Based Reward shaping
+
+        Parameters:
+            - terminated: boolean if the agent has found the optimum or not
+
+        Return:
+            - reward: the calculated reward for this action in state.
+        """
         if self.backend.has_precomputed_stats:
             # Reflect the objective directly
             true_reward = 1.0 if terminated else 0.0

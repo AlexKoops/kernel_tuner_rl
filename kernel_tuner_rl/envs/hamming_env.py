@@ -3,6 +3,9 @@ import numpy as np
 from kernel_tuner_rl.envs import KernelTunerRLEnvBase
 
 class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
+    """
+    Environment to train PPO-based agents with a Hamming-1 distance action space
+    """
     def __init__(self, backend):
         super().__init__(backend)
 
@@ -22,6 +25,12 @@ class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
         self.action_space = gym.spaces.Discrete(self.number_of_parameters * 2)
 
     def _get_obs(self):
+        """
+        Create a list of normalized config, execution times and step progress
+
+        Return:
+            - array of normalized observations
+        """
         normalized_list = []
         # Current config
         normalized_list.extend(self._normalize_config(self.current_config))
@@ -35,6 +44,12 @@ class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
         return np.array(normalized_list, dtype=np.float32)
 
     def action_masks(self) -> np.ndarray:
+        """
+        Create a boolean array for each action stating if it is valid or not
+
+        Return:
+            - boolean array showing valid and invalid actions as True and False respectively
+        """
         mask_list = []
         tune_params = self.tune_params
         for key in self.current_config:
@@ -63,7 +78,19 @@ class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
         return self._get_obs(), self._get_info()
 
     def step(self, action):
-        # move agent to next config, following the correct direction
+        """
+        Move agent to next config, following the correct direction
+
+        Parameters:
+            - action: the chosen action to take by the agent
+
+        Return:
+            - observation: the new observation the agent sees after taking action
+            - reward: the reward this action resulted in 
+            - terminated: boolean if the agent used all its episode budget
+            - truncated: boolean if the agent has found the optimal solution 
+            - info: additional debug info
+        """
 
         param_index = action // 2  # the parameter where the step will occur
         direction = action % 2  # the direction the parameter value will step to
