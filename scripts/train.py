@@ -22,7 +22,7 @@ from stable_baselines3.common.monitor import Monitor
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from kernel_tuner_rl.envs import KernelTunerRLEnvSmall, KernelTunerRLEnvBig
+from kernel_tuner_rl.envs import KernelTunerRLEnvHamming, KernelTunerRLEnvPerparameter
 from kernel_tuner_rl.backends import CacheBackend
 from kernel_tuner_rl.utils import get_kernel_name
 
@@ -86,7 +86,7 @@ def make_env(agent, cache_file, index):
     log_dir = f"tmp/env_{index}/"
     os.makedirs(log_dir, exist_ok=True)
     def _init():
-        RLEnv = KernelTunerRLEnvBig if agent == 'perparameter' else KernelTunerRLEnvSmall
+        RLEnv = KernelTunerRLEnvPerparameter if agent == 'perparameter' else KernelTunerRLEnvHamming
         backend = CacheBackend(str(cache_file))
         env = RLEnv(backend)
         env = Monitor(env, log_dir,

@@ -15,7 +15,7 @@ import numpy as np
 from sb3_contrib.ppo_mask import MaskablePPO
 from sb3_contrib.common.wrappers import ActionMasker
 
-from kernel_tuner_rl.envs import KernelTunerRLEnvSmall, KernelTunerRLEnvBig
+from kernel_tuner_rl.envs import KernelTunerRLEnvHamming, KernelTunerRLEnvPerparameter
 from kernel_tuner_rl.backends import CacheBackend
 from kernel_tuner_rl.utils import random_baseline
 
@@ -109,7 +109,7 @@ def evaluate_one(model, cache_file, n_episodes, agent):
     Return:
         dict with evaluation metrics used for performance display
     """
-    RLEnv = KernelTunerRLEnvBig if agent == 'perparameter' else KernelTunerRLEnvSmall
+    RLEnv = KernelTunerRLEnvPerparameter if agent == 'perparameter' else KernelTunerRLEnvHamming
     backend = CacheBackend(str(cache_file))
     env = RLEnv(backend)
     env = ActionMasker(env, mask_fn)
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     print(f"Evaluating {len(model_paths)} model(s): {[m.name for m in model_paths]}")
 
     probe_backend = CacheBackend(str(cache_files[0]))
-    RLEnv = KernelTunerRLEnvBig if agent == 'perparameter' else KernelTunerRLEnvSmall
+    RLEnv = KernelTunerRLEnvPerparameter if agent == 'perparameter' else KernelTunerRLEnvHamming
     probe_env = RLEnv(probe_backend)
     n_params = probe_env.number_of_parameters
     base_dim = n_params + 3
