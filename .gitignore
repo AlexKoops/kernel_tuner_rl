@@ -8,3 +8,9 @@ tmp/
 figures/
 uv.lock
 .python-version
+*.db
+results/
+plots/
+.DS_Store
+*.pyc 
+dist/
