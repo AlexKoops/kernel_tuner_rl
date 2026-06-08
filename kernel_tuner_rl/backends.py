@@ -1,3 +1,10 @@
+"""
+Backend abstractions used by the environment to handle both cache file input and Kernel Tuner input
+
+Contains two abstractions:
+    - CacheBackend: handles cachefile input
+    - KernelTunerBackend: handles inputs from Kernel Tuner
+"""
 from abc import ABC, abstractmethod
 import numpy as np
 from kernel_tuner.searchspace import Searchspace
@@ -10,6 +17,9 @@ from kernel_tuner_rl.utils import cache_to_searchSpaceInfo, config_to_string
 
 
 class Backend(ABC):
+    """
+    Shared base for both backend abstractions
+    """
 
     @property
     @abstractmethod
@@ -45,11 +55,17 @@ class Backend(ABC):
         pass
 
     def get_max_steps(self):
+        """
+        Sets the episode length to 5% of the searchspace size, capped at 1000 timesteps to avoid extremely long episodes
+        """
         searchspace_percentage = 0.05
         return int(min(1000, self.get_searchspace_size() * searchspace_percentage))
 
 
 class CacheBackend(Backend):
+    """
+    Backend abstraction handling a cache file as data source.
+    """
 
     def __init__(self, cache_file):
         # searchspace has form:
@@ -80,6 +96,7 @@ class CacheBackend(Backend):
         # }
         self.valid_configs = {config_to_string(c) for c in self.searchspace}
         self.all_times = list(t for t in (self.get_exec_time(c) for c in self.searchspace))
+        self.valid_times = [t for t in self.all_times if t != float('inf')]
 
     @property
     def has_precomputed_stats(self):
@@ -115,16 +132,19 @@ class CacheBackend(Backend):
         return self.searchspace[index]
 
     def get_max_exec(self):
-        return float(max(self.all_times))
+        return float(max(self.valid_times))
 
     def get_opti_exec(self):
-        return float(min(self.all_times))
+        return float(min(self.valid_times))
 
     def get_median_exec(self):
-        return float(np.median(self.all_times))
+        return float(np.median(self.valid_times))
 
 
 class KernelTunerBackend(Backend):
+    """
+    Backend handling Kernel Tuner input as a data source
+    """
 
     def __init__(self, searchspace_object: Searchspace, runner: Runner, tune_options, calibration_samples: int = 30):
         # {(16, 1): 0, (16, 2): 1, (32, 1): 2}
@@ -147,6 +167,13 @@ class KernelTunerBackend(Backend):
         self._calibrate(min(calibration_samples, 5))
 
     def _calibrate(self, n_samples):
+        """
+        Gathers some environment data when there don't exist global stats of the environment.
+        This data is used for normalization during deployment, data is set as class attributes
+
+        Parameters:
+            n_samples: amount of samples used to calibrate the global stats with
+        """
         valid_list = list(self.valid_configs)
         rng = np.random.default_rng()
         n = min(n_samples, len(valid_list))
