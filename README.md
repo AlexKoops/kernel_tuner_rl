@@ -46,6 +46,8 @@ pip install -e .
 
 ## Usage
 
+Unpack the .gz files from the clean_cache/ directory
+
 ### Training an agent
 
 ```bash
