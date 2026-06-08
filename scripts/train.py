@@ -5,8 +5,8 @@ Trains a MaskablePPO agent on one or more GPU kernel cache files simultaneously.
 The trained model is saved to models/<kernel_name>/<agent>_<tag>_ppo_seed<seed>.
 
 Usage examples:
-    python scripts/train.py --agent hamming --train cache_files/<kernel_name>/*.json --seed 0 --total-timesteps 600000 --tag example
-    python scripts/train.py --agent perparameter --train cache_files/<kernel_name>/*.json --seed 0 --total-timesteps 2000000 --tag example
+    python scripts/train.py --agent hamming --train clean_cache/<kernel_name>/*.json --seed 0 --total-timesteps 600000 --tag example
+    python scripts/train.py --agent perparameter --train clean_cache/<kernel_name>/*.json --seed 0 --total-timesteps 2000000 --tag example
 """
 import os
 import sys
