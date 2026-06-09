@@ -94,16 +94,3 @@ Pre-computed brute-forced search spaces from the [AutoTuningAssociation benchmar
 ## Citation / Reference
 
 This work builds on [Kernel Tuner](https://github.com/KernelTuner/kernel_tuner) by Ben van Werkhoven.
-
-Accompanying thesis:
-
-```bibtex
-@bachelorsthesis{koops2026,
-  author  = {Alexander Koops},
-  title   = {Reinforcement Learning as a Strategy for Auto-Tuning with Kernel Tuner},
-  school  = {Leiden Institute of Advanced Computer Science (LIACS), Leiden University},
-  year    = {2026},
-  type    = {Bachelor Thesis}
-}
-```
-
