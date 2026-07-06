@@ -146,7 +146,7 @@ class KernelTunerBackend(Backend):
     Backend handling Kernel Tuner input as a data source
     """
 
-    def __init__(self, searchspace_object: Searchspace, runner: Runner, tune_options, calibration_samples: int = 30):
+    def __init__(self, searchspace_object: Searchspace, runner: Runner, tune_options, calibration_samples: int = 5):
         # {(16, 1): 0, (16, 2): 1, (32, 1): 2}
         # maps the configs to its index in self.list for fast lookup
         self.searchspace = searchspace_object
@@ -164,7 +164,7 @@ class KernelTunerBackend(Backend):
         
         self.cost_func = CostFunc(searchspace_object, tune_options, runner)
 
-        self._calibrate(min(calibration_samples, 5))
+        self._calibrate(max(calibration_samples, 5))
 
     def _calibrate(self, n_samples):
         """
