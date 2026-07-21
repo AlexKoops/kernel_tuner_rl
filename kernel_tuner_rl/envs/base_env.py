@@ -37,11 +37,42 @@ class KernelTunerRLEnvBase(gym.Env):
         self.best_seen_exec_time = None
         self.best_seen_config = None
         self.episode_start_exec_time = None
-        
+
+        self.visited_configs = set()
+
+    def _config_key(self, config):
+        """Hashable key for a configuration dict."""
+        return tuple(config[k] for k in self.param_keys)
+ 
+    def _mark_visited(self, config):
+        self.visited_configs.add(self._config_key(config))
+ 
+    def _is_unvisited(self, config):
+        return self._config_key(config) not in self.visited_configs
+ 
+    def _apply_novelty_mask(self, validity_mask, candidate_configs):
+        """
+        Given a boolean validity mask and the candidate config for each action,
+        prefer actions leading to unvisited configs. Falls back to the plain
+        validity mask if no valid action leads anywhere new (prevents deadlock).
+        """
+        novelty_mask = np.array(
+            [validity_mask[i] and self._is_unvisited(candidate_configs[i])
+             if candidate_configs[i] is not None else False
+             for i in range(len(validity_mask))],
+            dtype=np.bool_,
+        )
+        if novelty_mask.any():
+            return novelty_mask
+        return np.asarray(validity_mask, dtype=np.bool_)
+
+
 
     def _get_info(self):
-        # Generate extra info for debugging purposes
-        return {"best_seen_exec_time": self.best_seen_exec_time}
+        return {
+            "best_seen_exec_time": self.best_seen_exec_time,
+            "unique_configs_visited": len(self.visited_configs),
+        }
 
     def _normalize_config(self, config):
         """
@@ -94,6 +125,11 @@ class KernelTunerRLEnvBase(gym.Env):
         """
         super().reset(seed=seed)
 
+        # keep_visited is set to True during deployment to ensure restarts dont reset visited configurations
+        keep_visited = bool(options.get("keep_visited", False)) if options else False
+        if not keep_visited:
+            self.visited_configs = set()
+
         self.current_config = self.backend.get_random_start(self.np_random) # place agent on a random config
         self.step_count = 0
         self.current_exec_time = self.backend.get_exec_time(self.current_config) # get first config exec time
@@ -101,6 +137,20 @@ class KernelTunerRLEnvBase(gym.Env):
         self.best_seen_exec_time = self.current_exec_time
         self.best_seen_config = self.current_config.copy()
         self.episode_start_exec_time = self.current_exec_time
+        self._mark_visited(self.current_config)
+
+    def _update_after_step(self):
+        """
+        Shared bookkeeping subclasses call inside step() after setting the new
+        current_config: evaluates it, updates best-seen (remembering the
+        previous best for the reward), and records the visit.
+        """
+        self.prev_best_seen_exec_time = self.best_seen_exec_time
+        self.current_exec_time = self.backend.get_exec_time(self.current_config)
+        if self.current_exec_time < self.best_seen_exec_time:
+            self.best_seen_exec_time = self.current_exec_time
+            self.best_seen_config = self.current_config.copy()
+        self._mark_visited(self.current_config)
 
     def _compute_reward(self, terminated):
         """
@@ -117,8 +167,8 @@ class KernelTunerRLEnvBase(gym.Env):
             true_reward = 1.0 if terminated else 0.0
 
             # add Potential-Based shaping to the reward
-            phi_current = self.optimum_exec_time / self.current_exec_time
-            phi_prev = self.optimum_exec_time / self.prev_exec_time
+            phi_current = self.optimum_exec_time / self.best_seen_exec_time
+            phi_prev = self.optimum_exec_time / self.best_seen_exec_time
             
             # gives a reward, based on distance between current config and optimum
             F = self.gamma * phi_current - phi_prev

@@ -43,6 +43,27 @@ class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
 
         return np.array(normalized_list, dtype=np.float32)
 
+    def _candidate_for_action(self, action):
+        """Return the config this action leads to, or None if out of range."""
+        param_index = action // 2
+        direction = action % 2
+        key = self.param_keys[param_index]
+        values = self.tune_params[key]
+        index = values.index(self.current_config[key])
+ 
+        if direction == 0:
+            if index <= 0:
+                return None
+            new_index = index - 1
+        else:
+            if index >= len(values) - 1:
+                return None
+            new_index = index + 1
+ 
+        candidate = self.current_config.copy()
+        candidate[key] = values[new_index]
+        return candidate
+
     def action_masks(self) -> np.ndarray:
         """
         Create a boolean array for each action stating if it is valid or not
@@ -50,28 +71,13 @@ class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
         Return:
             - boolean array showing valid and invalid actions as True and False respectively
         """
-        mask_list = []
-        tune_params = self.tune_params
-        for key in self.current_config:
-            index = tune_params[key].index(self.current_config[key])
-
-            if index > 0:
-                # Create neighbour to check if it is not a restricted config
-                neighbour = self.current_config.copy()
-                neighbour[key] = tune_params[key][index - 1]
-                mask_list.append(self.backend.is_valid(neighbour))
-            else:
-                mask_list.append(False)
-
-            if index < len(tune_params[key]) - 1:
-                # Create neighbour to check if it is not a restricted config
-                neighbour = self.current_config.copy()
-                neighbour[key] = tune_params[key][index + 1]
-                mask_list.append(self.backend.is_valid(neighbour))
-            else:
-                mask_list.append(False)
-
-        return np.array(mask_list, dtype=np.bool_)
+        candidates = []
+        validity = []
+        for action in range(self.action_space.n):
+            candidate = self._candidate_for_action(action)
+            candidates.append(candidate)
+            validity.append(candidate is not None and self.backend.is_valid(candidate))
+        return self._apply_novelty_mask(validity, candidates)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed, options=options)
@@ -92,45 +98,26 @@ class KernelTunerRLEnvHamming(KernelTunerRLEnvBase):
             - info: additional debug info
         """
 
-        param_index = action // 2  # the parameter where the step will occur
-        direction = action % 2  # the direction the parameter value will step to
-
-        key_to_update = self.param_keys[param_index]
-        new_config = self.current_config.copy()
-
-        # get the index for the current parameter setting
-        tune_params = self.tune_params
-        tune_param_index = tune_params[key_to_update].index(new_config[key_to_update])
+        new_config = self._candidate_for_action(action)
+        # NOTE: with action masking, new_config is always valid; kept explicit
+        # for check_env() compatibility.
         self.prev_exec_time = self.current_exec_time
-
-        # create new config based on the parameter value the agent decided to change
-        # NOTE: to make the check_env() function pass, config validation checks should be added, since check_env does not use achtion masking
-        if direction == 0:
-            new_config[key_to_update] = tune_params[key_to_update][tune_param_index - 1]
-        else:
-            new_config[key_to_update] = tune_params[key_to_update][tune_param_index + 1]
-
-        # set new config
         self.current_config = new_config
         self.step_count += 1
-
+ 
         truncated = self.step_count >= self.max_steps
-
-        self.current_exec_time = self.backend.get_exec_time(self.current_config)
-        if self.current_exec_time < self.best_seen_exec_time:
-            self.best_seen_exec_time = self.current_exec_time
-            self.best_seen_config = self.current_config.copy()
-
+ 
+        self._update_after_step()
+ 
         if self.backend.has_precomputed_stats:
             terminated = self.current_exec_time == self.optimum_exec_time
         else:
             terminated = False
-
+ 
         reward = self._compute_reward(terminated)
-
+ 
         observation = self._get_obs()
         info = self._get_info()
         info["terminated_at_optimum"] = terminated
-        # return observation, reward, terminated, truncated and info
-
+ 
         return observation, reward, terminated, truncated, info

@@ -57,17 +57,19 @@ class KernelTunerRLEnvPerparameter(KernelTunerRLEnvBase):
         Return:
             - boolean array showing valid and invalid actions as True and False respectively
         """
-        mask = np.zeros(self.total_options, dtype=np.bool_)
-        for action_idx, (key, value_idx) in enumerate(self._action_lookup):
+        candidates = []
+        validity = []
+        for key, value_idx in self._action_lookup:
             current_v_idx = self.tune_params[key].index(self.current_config[key])
             if value_idx == current_v_idx:
+                candidates.append(None)
+                validity.append(False)
                 continue
-
             candidate = self.current_config.copy()
             candidate[key] = self.tune_params[key][value_idx]
-            if self.backend.is_valid(candidate):
-                mask[action_idx] = True
-        return mask
+            candidates.append(candidate)
+            validity.append(self.backend.is_valid(candidate))
+        return self._apply_novelty_mask(validity, candidates)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed, options=options)
@@ -102,23 +104,18 @@ class KernelTunerRLEnvPerparameter(KernelTunerRLEnvBase):
         # Update step count and truncate if at episode end
         self.step_count += 1
         truncated = self.step_count >= self.max_steps
-
-        # Update env attributes (if needed)
-        self.current_exec_time = self.backend.get_exec_time(self.current_config)
-        if self.current_exec_time < self.best_seen_exec_time:
-            self.best_seen_exec_time = self.current_exec_time
-            self.best_seen_config = self.current_config.copy()
-
-        # Terminate if optimum is found
+ 
+        self._update_after_step()
+ 
         if self.backend.has_precomputed_stats:
             terminated = self.current_exec_time == self.optimum_exec_time
         else:
             terminated = False
-
+ 
         reward = self._compute_reward(terminated)
-
+ 
         observation = self._get_obs()
         info = self._get_info()
         info["terminated_at_optimum"] = terminated
-
+ 
         return observation, reward, terminated, truncated, info
